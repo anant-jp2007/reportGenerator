@@ -77,6 +77,28 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 - Real production rows: all resolve against the chart except PE 63 "40 X 10" (row 343):
   PE 63 has no PN 10, so it will be flagged.
 
+## Reading the production file (Step 4, 2026-10-30)
+
+- Columns are found by **heading**, not position. Only Sr. No., Date, Size, Report No., Batch Number
+  are used; every other column (Brand Name, Meters, Remark, anything new) is ignored wherever it is.
+- The heading row is the one with Sr. No., Date and Size headings together (searched in the first 30 rows).
+- Headings are compared after removing case, spaces, dots and line breaks, and common variations match
+  ("SR.NO", "S.No.", "Batch No.", "Report Number"...). An exact heading beats a variation ("Date" beats
+  "Dispatch Date"). If two headings are equally likely, or a needed one is missing, that sheet stops with
+  a clear message (e.g. "Production 80: 'Batch Number' column not found"). It never guesses.
+- If a sheet can't be read in the old or new file, that grade is skipped (otherwise all its rows would look new).
+- Rows that can't get a report (skipped, with reason): size not understood, PN not made for that grade
+  (e.g. "40 X 10" on PE 63 — approved), size/SDR shown as "--" in the chart, PN and SDR contradicting.
+- Rows that still get a report, with a warning: SDR not written (taken from grade + PN), empty batch
+  (printed blank), empty Report No. (file named like `PE100-row53`).
+
+## Report engine (Step 5, 2026-10-30)
+
+- Sizes 710 mm and above have no ovality in the chart: both ovality cells are left blank, with a warning
+  (my recommendation; user hasn't confirmed).
+- If two reports in one run would get the same file name (e.g. MP63/007 exists in 2024 and 2025),
+  the second becomes `MP63-007-2`.
+
 ## Random ranges (approved)
 
 | Value | Range | Decimals |
