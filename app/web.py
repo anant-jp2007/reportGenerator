@@ -23,6 +23,8 @@ from flask import Flask, abort, render_template, request, send_file
 
 from app.production import GRADE_ORDER, find_new_rows
 from app.render_excel import write_excel, write_excel_combined
+from app.render_pdf import write_pdf, write_pdf_combined
+from app.render_word import write_word, write_word_combined
 from app.report import build_report
 from app.settings import SettingsError, companies, load_settings, with_company
 
@@ -143,6 +145,12 @@ def download():
     if not chosen:
         abort(400, "Tick at least one entry.")
     combined = request.form.get("files") == "one"
+    # the check screen always sends format_choice; without it (older forms) Excel is made
+    formats = [f for f in ("pdf", "excel", "word") if f in request.form.getlist("format")]
+    if not formats and "format_choice" not in request.form:
+        formats = ["excel"]
+    if not formats:
+        abort(400, "Tick at least one format: PDF, Excel or Word.")
 
     settings = with_company(load_settings(), (d / "company.txt").read_text(encoding="utf-8"))
     diff = find_new_rows(*_files(d))
@@ -158,11 +166,16 @@ def download():
 
     stamp = datetime.now().strftime("%Y-%m-%d %H%M%S")
     out = OUTPUT / stamp
-    if combined:
-        write_excel_combined(reports, out / f"Test certificates {stamp[:10]}.xlsx")
-    else:
-        for rep in reports:
-            write_excel(rep, out / f"{rep.file_name}.xlsx")
+    writers = {"excel": (".xlsx", write_excel, write_excel_combined),
+               "pdf": (".pdf", write_pdf, write_pdf_combined),
+               "word": (".docx", write_word, write_word_combined)}
+    for fmt in formats:
+        ext, one, many = writers[fmt]
+        if combined:
+            many(reports, out / f"Test certificates {stamp[:10]}{ext}")
+        else:
+            for rep in reports:
+                one(rep, out / f"{rep.file_name}{ext}")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:

@@ -114,6 +114,21 @@ z = zipfile.ZipFile(io.BytesIO(r.data))
 check("only ticked entries, all in one file", len(z.namelist()) == 1 and
       len(openpyxl.load_workbook(io.BytesIO(z.read(z.namelist()[0]))).sheetnames) == 2, z.namelist())
 
+r = client.post("/download", data={"token": token, "row": ids[:2], "files": "each", "format_choice": "1",
+                                   "format": ["pdf", "word"]})
+names = sorted(zipfile.ZipFile(io.BytesIO(r.data)).namelist())
+check("PDF + Word ticked: a .pdf and a .docx per certificate",
+      names == sorted(["MP63-171.pdf", "MP63-171.docx", "MP100-015.pdf", "MP100-015.docx"]), names)
+r = client.post("/download", data={"token": token, "row": ids, "files": "one", "format_choice": "1",
+                                   "format": ["pdf", "excel", "word"]})
+names = sorted(zipfile.ZipFile(io.BytesIO(r.data)).namelist())
+check("all three formats in one file each", [n.rsplit(".", 1)[1] for n in names] == ["docx", "pdf", "xlsx"], names)
+r = client.post("/download", data={"token": token, "row": ids, "files": "each", "format_choice": "1"})
+check("no format ticked: clear message", r.status_code == 400 and "Tick at least one format" in text(r))
+html = text(upload(old, real))
+check("check screen offers PDF (ticked), Excel and Word",
+      'value="pdf" checked' in html and 'value="excel"' in html and 'value="word"' in html)
+
 r = client.post("/download", data={"token": token, "files": "each"})
 check("nothing ticked: clear message", r.status_code == 400 and "Tick at least one entry" in text(r))
 r = client.post("/download", data={"token": "abc123", "row": ids, "files": "each"})
