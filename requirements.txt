@@ -1,0 +1,12 @@
+# Reading the production register (.xls) and the weight chart
+xlrd==2.0.2
+# Reading/writing .xlsx (test report template and Excel output)
+openpyxl==3.1.5
+# Word output
+python-docx==1.2.0
+# PDF output
+reportlab==5.1.0
+# Images (signature)
+pillow==13.0.0
+# Local website
+flask==3.1.3

@@ -1,0 +1,185 @@
+{
+  "_readme": [
+    "Settings for the test report generator. Edit values, keep the structure.",
+    "Cell names (D7, J24, ...) are the cells of templates/test_report.xlsx; PDF and Word use the same layout.",
+    "In texts, \\n is a line break and ^{2} is a superscript 2 (Kgs/Cm^{2}).",
+    "Random ranges: min and max are both possible; 'decimals' is how many decimals are printed;",
+    "'step' (optional) is the smallest change, e.g. 0.05 gives values like 1.55 or 2.30, 5 gives 600, 605, 610."
+  ],
+
+  "company": {
+    "selected": "balaji",
+    "profiles": {
+      "balaji": {
+        "A1": "BALAJI POLYPLAST",
+        "A2": "(An ISO 9001:2000 Company )",
+        "A3": "Survey No. 693, Plot No.1, Rajkot - Jamnagar Highway, Nr. Jivil Polytech",
+        "A4": "Village :- Metoda, Tal. :- Paddhari,  Dist :- Rajkot - 360 110 ( Gujarat )",
+        "A5": "( TEST CERTIFICATE OF HDPE PIPES IS 4984 : 2016 CM/L - 3712656  )"
+      }
+    }
+  },
+
+  "report": {
+    "_help": "Report No. counts 1, 2, 3... in generation order (PE 63, then PE 80, then PE 100, top to bottom). Editable before generating.",
+    "number_starts_at": 1,
+    "grade_order": ["PE 63", "PE 80", "PE 100"],
+    "date_format": "dd-mm-yyyy",
+    "testing_start_days_after_manufacturing": 0,
+    "testing_end_days_after_start": 3,
+    "file_name": "Production column D (REPORT NO.) with / replaced by -, e.g. MP100/019 -> MP100-019"
+  },
+
+  "header_cells": {
+    "_help": "Where each value from the production row goes.",
+    "report_no": "D7",
+    "date_of_manufacturing": "D8",
+    "testing_start": "D9",
+    "testing_end": "D10",
+    "batch": "D11",
+    "grade": "J7",
+    "pn": "J8",
+    "dn": "J9",
+    "sdr": "J10"
+  },
+
+  "chart_cells": {
+    "_help": "Specification limits looked up in the IS 4984 weight chart (data/is4984_chart.json) by DN and SDR.",
+    "decimals": 2,
+    "E20": "pipe_end",
+    "E24": "od_min",
+    "E25": "od_max",
+    "E26": "wall_min",
+    "E27": "wall_max",
+    "E28": "ovality_max"
+  },
+
+  "random_values": {
+    "_help": "Test values obtained. New random values every time a report is generated.",
+    "stripe_width":  {"cell": "J17", "min": 3.00, "max": 7.00, "decimals": 2},
+    "stripe_depth":  {"cell": "J18", "min": 0.10, "max": 0.16, "decimals": 2},
+    "pipe_end": {
+      "cell": "G20", "decimals": 2, "step": 0.05,
+      "_help": "Range depends on the chart's Pipe End maximum (E20). Only this value ends in 0 or 5.",
+      "range_by_chart_max": {"2": [0.75, 1.50], "3": [1.00, 2.25], "4": [1.25, 3.00], "5": [1.50, 3.75], "7": [2.00, 6.00]},
+      "other_max_fraction": [0.375, 0.75]
+    },
+    "outside_diameter": {
+      "cells": {"minimum": "J24", "maximum": "J25"}, "decimals": 2, "step": 0.1,
+      "_help": "Both inside the chart OD min-max (E24-E25); obtained minimum is never above obtained maximum."
+    },
+    "wall_thickness": {
+      "cells": {"minimum": "J26", "maximum": "J27"}, "decimals": 2, "step": 0.01,
+      "_help": "Both inside the chart wall min-max (E26-E27); obtained minimum is never above obtained maximum."
+    },
+    "ovality": {
+      "cell": "G28", "decimals": 2, "step": 0.01,
+      "fraction_of_chart_max": [0.25, 0.75],
+      "_help": "Kept a decent distance from 0 and from the chart maximum (E28)."
+    },
+    "longitudinal_reversion": {"cell": "G30", "min": 1.00, "max": 2.00, "decimals": 2},
+    "carbon_black_content":   {"cell": "G31", "min": 2.30, "max": 2.60, "decimals": 2},
+    "melt_flow_rate": {
+      "cell": "G33", "decimals": 3,
+      "_help": "Ranges must not overlap so PE 100 < PE 80 < PE 63 always holds.",
+      "by_grade": {"PE 100": [0.230, 0.270], "PE 80": [0.420, 0.480], "PE 63": [0.750, 0.850]}
+    },
+    "density":                {"cell": "G35", "min": 947.00, "max": 951.00, "decimals": 2},
+    "elongation_at_break":    {"cell": "G36", "min": 600, "max": 750, "decimals": 0, "step": 5},
+    "yield_strength":         {"cell": "G37", "min": 18.00, "max": 23.00, "decimals": 2}
+  },
+
+  "empty_cells": {
+    "_help": "Test values left empty for now (units stay).",
+    "cells": ["G21", "G23"]
+  },
+
+  "signature": {
+    "file": "assets/signature.png",
+    "next_to": "B39"
+  },
+
+  "fixed_text": {
+    "_help": "Every fixed text of the report. Same on every report.",
+    "B7": "Test Report No.                       :- ",
+    "B8": "Date of Manufacturing            :-",
+    "B9": "Date of Testing Start               :-",
+    "B10": "Date of Testing End                 :-",
+    "B11": "Batch Number                          :-",
+    "G7": "M. Grade         :-  ",
+    "G8": "PN                   :-  ",
+    "G9": "SIZE ( DN )    :-",
+    "G10": "SDR                :- ",
+    "K8": "Kgs/Cm^{2}",
+    "K9": "mm",
+
+    "A13": "Sr. \nNo.",
+    "B13": "Clause \nNo.",
+    "C13": "Name of the Test",
+    "D13": "Specification Requirments",
+    "G13": "Test value obtained",
+
+    "A14": 1, "B14": 6.2, "C14": "Colour",
+    "D14": "Colour of pipe shall be black \nwith blue identification strips.",
+    "G14": "Black",
+    "G15": "Blue",
+
+    "A16": 2, "B16": "6.2.1", "C16": "Identification Stripes",
+    "D16": "Minimum three strips 3 mm in Blue\n 0.20 depth wall thickness up to 10 mm, \n0.50 mm beyond 10 mm",
+    "G16": "No. of Strips", "J16": 3, "L16": "Nos",
+    "G17": "Width ( min.)", "L17": "mm",
+    "G18": "Depth ( Max. )", "L18": "mm",
+
+    "A19": 3, "B19": 7.1, "C19": "Visual appearance",
+    "D19": "The internal & external surfaces of pipe shall be smooth, clean and free from grooving and other defects.The ends of the pipes  shall be cleanly cut and square with the axis of the pipe.",
+    "G19": "Satisfactory",
+    "C20": "Square of  Pipe End", "D20": "Maximum ", "F20": "mm", "J20": "mm",
+
+    "A21": 4, "B21": 7.2, "C21": "Length of Pipes (min.)",
+    "D21": "As Declared by Manufacturer",
+    "D22": "Short Lengths 3 meter (Minimum)",
+    "J21": "meters",
+
+    "A23": 5, "B23": 7.3, "C23": "Coiling",
+    "D23": "Shall not be less than 18dn",
+    "J23": "mm",
+
+    "A24": 6, "B24": 7.4, "C24": "Outside Diameter",
+    "D24": "Minimum :-", "F24": "mm", "G24": "      Minimum ", "L24": "mm",
+    "D25": "Maximum :-", "F25": "mm", "G25": "      Maximum ", "L25": "mm",
+
+    "A26": 7, "B26": 7.4, "C26": "Wall Thickness",
+    "D26": "Minimum :-", "F26": "mm", "G26": "     Minimum ", "L26": "mm",
+    "D27": "Maximum :-", "F27": "mm", "G27": "     Maximum", "L27": "mm",
+
+    "A28": 8, "B28": "7.4.1.2", "C28": "Ovality",
+    "D28": "Maximum :-", "F28": "mm", "J28": "mm",
+
+    "A29": 9, "B29": "8.1.1", "C29": "Internal Pressure Creep Rupture Test",
+    "D29": "The pipe shall show no signs of localized swelling, leakage or burst during Temp.=80°C Duration= 48 Hours",
+    "G29": "Satisfactory",
+
+    "A30": 10, "B30": 8.2, "C30": "Longitudinal Reversion",
+    "D30": "Shall not be greater than 3.00 %", "J30": "%",
+
+    "A31": 11, "B31": 8.3, "C31": "Carbon Black Content \n&\n Dispersion",
+    "D31": "CBC - 2.50  ±  0.50 %", "J31": "%",
+    "D32": "CBD - Shall be satisfactory", "G32": "Satisfactory",
+
+    "A33": 12, "B33": 8.4, "C33": "Melt Flow Rate",
+    "D33": "0.15 to 1.10 gm/10 min. (Both inclusive )", "J33": "gm/10 min.",
+
+    "A34": 13, "B34": 8.5, "C34": "Oxidation Induction Time",
+    "D34": "Shall not be less than 20 min.", "G34": "                    > 20", "J34": "Minutes",
+
+    "A35": 14, "B35": 8.7, "C35": "Density",
+    "D35": "940 To 960 kg/m^{3}", "J35": "Kgs/m^{3}",
+
+    "A36": 15, "B36": 8.9, "C36": "Elongation at break",
+    "D36": "≥  350 %", "J36": "%",
+    "C37": "Yield Strength",
+    "D37": "Shall not be less than 15 MPa ", "J37": "MPa",
+
+    "B39": "Tested by :-"
+  }
+}

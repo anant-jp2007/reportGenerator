@@ -58,7 +58,25 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 - Table header keeps the original spelling "Specification Requirments" (do not fix). Only rows 21–22 spelling is fixed.
 - Random values are drawn fresh **every time** a report is generated, even for the same row or the same size; reports must not repeat values.
 
-## Random ranges (pipe end approved; the rest still awaiting OK)
+- All random ranges below approved by the user.
+- Rows edited after their report was made ("modified" rows) are ignored: no new report.
+- Defaults (no objection): one A4 portrait page per report; sizes not in the chart (shown as "--"),
+  PN not made for that grade, or rows with no date are flagged and skipped; the rest still generate.
+- The live values are in `config/settings.json`; this file explains them. If the two ever differ,
+  settings.json is what the app uses.
+
+## Notes found while building (2026-10-30)
+
+- The weight chart file disagrees with itself on **pipe end** for OD 75, 125 and 180:
+  main sheet and "Page - 02" say 2 / 3 / 4, "Page - 01" says 3 / 4 / 5. The issued sample
+  reports (75 → 2, 125 → 3) follow the main sheet, so the app uses the main sheet. Awaiting user confirmation.
+- Template cells J8 / J9 / J10 had number format "0", which would print SDR 13.6 as 14 and
+  PN 12.5 as 13. Changed to General in the app's template.
+- OD test values use steps of 0.1 mm (75.10, 315.50) like the samples, printed with 2 decimals.
+- Real production rows: all resolve against the chart except PE 63 "40 X 10" (row 343):
+  PE 63 has no PN 10, so it will be flagged.
+
+## Random ranges (approved)
 
 | Value | Range | Decimals |
 |---|---|---|
