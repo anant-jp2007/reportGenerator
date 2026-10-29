@@ -1,0 +1,22 @@
+# Signature: never upload
+assets/signature*
+
+# Business data: production registers and generated reports
+*.xls
+*.xlsx
+!templates/*.xlsx
+output/
+uploads/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+~$*
