@@ -71,10 +71,16 @@ def pick(rng: random.Random, lo: float, hi: float, decimals: int, step: float | 
     return round(rng.randint(first, last) * step, decimals)
 
 
-def pick_pair(rng, lo, hi, decimals, step) -> tuple[float, float]:
-    """Obtained minimum and maximum: both inside [lo, hi], minimum below maximum."""
+def pick_pair(rng, lo, hi, decimals, step, strictly_inside=False) -> tuple[float, float]:
+    """Obtained minimum and maximum: both inside [lo, hi], minimum below maximum.
+
+    strictly_inside: never exactly on lo or hi (falls back to touching only if the
+    range is too narrow to hold two values inside it).
+    """
     step = step or 10 ** -decimals
     first, last = math.ceil(round(lo / step, 9)), math.floor(round(hi / step, 9))
+    if strictly_inside and (last - 1) - (first + 1) >= 1:
+        first, last = first + 1, last - 1
     if last - first >= 1:
         a, b = sorted(rng.sample(range(first, last + 1), 2))
     else:
@@ -157,7 +163,7 @@ def build_report(row: Row, number: int, settings: dict | None = None,
     for name, lo, hi in (("outside_diameter", spec.od_min, spec.od_max),
                          ("wall_thickness", spec.wall_min, spec.wall_max)):
         c = rv[name]
-        a, b = pick_pair(rng, lo, hi, c["decimals"], c.get("step"))
+        a, b = pick_pair(rng, lo, hi, c["decimals"], c.get("step"), c.get("strictly_inside", False))
         put_num(c["cells"]["minimum"], a, c["decimals"])
         put_num(c["cells"]["maximum"], b, c["decimals"])
 

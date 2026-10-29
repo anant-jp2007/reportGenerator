@@ -65,12 +65,12 @@
       "other_max_fraction": [0.375, 0.75]
     },
     "outside_diameter": {
-      "cells": {"minimum": "J24", "maximum": "J25"}, "decimals": 2, "step": 0.1,
-      "_help": "Both inside the chart OD min-max (E24-E25); obtained minimum is never above obtained maximum."
+      "cells": {"minimum": "J24", "maximum": "J25"}, "decimals": 2, "step": 0.1, "strictly_inside": true,
+      "_help": "Both inside the chart OD min-max (E24-E25), never exactly on a limit; obtained minimum is below obtained maximum."
     },
     "wall_thickness": {
-      "cells": {"minimum": "J26", "maximum": "J27"}, "decimals": 2, "step": 0.01,
-      "_help": "Both inside the chart wall min-max (E26-E27); obtained minimum is never above obtained maximum."
+      "cells": {"minimum": "J26", "maximum": "J27"}, "decimals": 2, "step": 0.01, "strictly_inside": true,
+      "_help": "Both inside the chart wall min-max (E26-E27), never exactly on a limit; obtained minimum is below obtained maximum."
     },
     "ovality": {
       "cell": "G28", "decimals": 2, "step": 0.01,

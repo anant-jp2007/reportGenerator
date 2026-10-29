@@ -82,12 +82,12 @@ for rep in reports:
          (tag, pe.text, sp.pipe_end))
 
     a, b = c["J24"].value, c["J25"].value
-    rule("OD obtained: both inside chart min-max, minimum < maximum, 0.1 steps, 2 decimals",
-         sp.od_min <= a < b <= sp.od_max and on_step(a, 0.1) and on_step(b, 0.1)
+    rule("OD obtained: strictly inside chart min-max (never on a limit), minimum < maximum, 0.1 steps, 2 decimals",
+         sp.od_min < a < b < sp.od_max and on_step(a, 0.1) and on_step(b, 0.1)
          and decimals_ok(c["J24"], 2), (tag, a, b, sp.od_min, sp.od_max))
     a, b = c["J26"].value, c["J27"].value
-    rule("wall obtained: both inside chart min-max, minimum < maximum, 2 decimals",
-         sp.wall_min <= a < b <= sp.wall_max and decimals_ok(c["J26"], 2), (tag, a, b, sp.wall_min, sp.wall_max))
+    rule("wall obtained: strictly inside chart min-max (never on a limit), minimum < maximum, 2 decimals",
+         sp.wall_min < a < b < sp.wall_max and decimals_ok(c["J26"], 2), (tag, a, b, sp.wall_min, sp.wall_max))
     ov = c["G28"].value
     rule("ovality: between 25% and 75% of chart max (away from 0 and the max)",
          0.25 * sp.ovality_max - 1e-9 <= ov <= 0.75 * sp.ovality_max + 1e-9, (tag, ov, sp.ovality_max))
@@ -151,6 +151,21 @@ r.grade, r.spec = "PE 100", lookup("PE 100", 710, 5)
 rep = build_report(r, 1)
 check("710 mm: no ovality in chart -> both ovality cells blank, with a warning",
       rep.cells["E28"].text == "" and rep.cells["G28"].text == "" and any("ovality" in w for w in rep.warnings))
+
+# every size and SDR in the chart is wide enough for strictly-inside values (no fallback to the limit)
+import random  # noqa: E402
+from app.chart import chart  # noqa: E402
+from app.report import pick_pair  # noqa: E402
+
+rng, tight = random.Random(1), []
+for od, size in chart()["sizes"].items():
+    for sdr, w in size["wall"].items():
+        for _ in range(20):
+            a, b = pick_pair(rng, size["od_min"], size["od_max"], 2, 0.1, True)
+            x, y = pick_pair(rng, w["min"], w["max"], 2, 0.01, True)
+            if not (size["od_min"] < a < b < size["od_max"] and w["min"] < x < y < w["max"]):
+                tight.append((od, sdr, a, b, x, y))
+check("all chart sizes x SDRs: OD and wall land strictly inside, minimum < maximum", not tight, tight[:3])
 
 # warnings from the row travel with the report
 nb = next(x for x in good if not x.batch)

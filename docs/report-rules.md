@@ -96,6 +96,9 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 
 - Sizes 710 mm and above have no ovality in the chart: both ovality cells are left blank, with a warning
   (my recommendation; user hasn't confirmed).
+- **User decision:** OD and wall thickness values obtained stay **strictly inside** the chart limits,
+  never exactly on them (`strictly_inside` in settings). Every chart size/SDR is wide enough for this.
+  For the narrowest OD ranges (0.3 mm, e.g. 32.00–32.30) this means the values are always 32.10 and 32.20.
 - If two reports in one run would get the same file name (e.g. MP63/007 exists in 2024 and 2025),
   the second becomes `MP63-007-2`.
 
