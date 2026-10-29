@@ -1,6 +1,6 @@
 # reportGenerator
 
-Generates **test certificates for HDPE pipes (IS 4984 : 2016)** from a factory's production register.
+Generates **test certificates for HDPE pipes (IS 4984 : 2016)** from a production register.
 Upload the register as it was last time and as it is now; the app finds the new production entries, fills a
 certificate for each one, and downloads them as **PDF, Excel and/or Word**.
 
@@ -55,8 +55,7 @@ cd reportGenerator
 python -m pip install -r requirements.txt
 ```
 
-Add the files that aren't in the repository (see [What's not in the repository](#whats-not-in-the-repository)).
-At minimum, add a signature image at `assets/signature.png`. Then start the app:
+Add a signature image at `assets/signature.png` (it's printed after "Tested by :-"), then start the app:
 
 ```bash
 python -m app.web
@@ -110,10 +109,10 @@ company menu.
 
 [data/is4984_chart.json](data/is4984_chart.json) holds, for 36 nominal ODs (16–2500 mm) and 10 SDRs, the mean OD
 limits, maximum ovality, pipe-end tolerance, wall thickness limits and weight per metre, plus the grade + SDR → PN
-table. It's imported from the factory's weight chart workbook:
+table. It's imported from a weight chart workbook laid out like the standard's tables:
 
 ```bash
-python tools/import_chart.py "WEIGHT CHART - AMD-02 All Pages.xls"
+python tools/import_chart.py path/to/weight_chart.xls
 ```
 
 ## The certificate template
@@ -154,8 +153,8 @@ python tests/run_all.py
 
 The test files cover the chart (against issued certificates), the settings, reading registers with altered
 layouts, the report engine (1000+ generated certificates checked against every rule), each output format, the
-website, and an end-to-end run on the sample registers. Most of them read a real register from `data/source/`,
-which isn't in the repository. `test_end_to_end.py` makes its own registers and runs anywhere.
+website, and an end-to-end run on generated sample registers. Most test files take a register to read as
+their first argument (default `data/source/production_sample.xls`); `test_end_to_end.py` makes its own and needs none.
 
 ## Development tools
 
@@ -165,13 +164,11 @@ which isn't in the repository. `test_end_to_end.py` makes its own registers and 
 | `tools/make_sample_registers.py` | before/after sample registers covering the special cases |
 | `tools/compare/` | measure our PDF / Word against Excel's own print (needs Excel and Word) |
 
-## What's not in the repository
+## Local files
 
-On purpose (see `.gitignore`):
-
-- `assets/signature*`: the tester's signature
-- `data/source/`: real production registers, the source weight chart and sample certificates
-- `uploads/`, `output/`: uploaded registers (deleted after a day) and generated certificates
+Files that belong to an installation stay on that computer and aren't part of the repository: the signature
+image (`assets/`), input files (`data/source/`, `samples/`), uploaded registers (`uploads/`, deleted after a day)
+and generated certificates (`output/`).
 
 ## Limitations
 

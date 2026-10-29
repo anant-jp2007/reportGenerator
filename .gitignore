@@ -1,12 +1,12 @@
-# Signature: never upload
-assets/signature*
-
-# Business data: production registers and generated reports
+# Local files supplied per installation
+assets/
+data/source/
+samples/
+output/
+uploads/
 *.xls
 *.xlsx
 !templates/*.xlsx
-output/
-uploads/
 
 # Python
 __pycache__/
