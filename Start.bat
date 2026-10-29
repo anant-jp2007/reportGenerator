@@ -12,11 +12,14 @@ if errorlevel 1 (
   exit /b 1
 )
 
-python -c "import flask, openpyxl, xlrd" >nul 2>nul
+python -c "import flask, openpyxl, xlrd, docx, reportlab" >nul 2>nul
 if errorlevel 1 (
   echo   Installing what the app needs, one time only...
   python -m pip install --quiet -r requirements.txt
 )
+
+rem Close any copy of the app that is still open (an older one would keep showing old screens)
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -match 'app\.web' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>nul
 
 python -m app.web
 pause
