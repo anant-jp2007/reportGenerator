@@ -1,0 +1,285 @@
+/* Test certificates – see docs/web-design.md for the reasoning behind these choices. */
+
+:root {
+  --paper: #F6F8FA;
+  --sheet: #FFFFFF;
+  --pipe: #1B232B;
+  --stripe: #1D5FC4;
+  --stripe-dark: #164C9E;
+  --rule: #D3DAE1;
+  --quiet: #5B6772;
+  --caution: #9A5B00;
+  --caution-bg: #FFF6E5;
+  --stop: #B3261E;
+  --stop-bg: #FDECEA;
+
+  --font: "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
+  --t-small: 13px;
+  --t-body: 15px;
+  --t-h3: 18px;
+  --t-h2: 23px;
+  --t-h1: 29px;
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--paper); }
+
+body {
+  margin: 0;
+  padding: 40px 24px 80px;
+  color: var(--pipe);
+  font-family: var(--font);
+  font-size: var(--t-body);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+main, .masthead { max-width: 860px; margin: 0 auto; }
+
+a { color: var(--stripe); }
+a:hover { color: var(--stripe-dark); }
+
+:focus-visible { outline: 3px solid var(--stripe); outline-offset: 2px; }
+
+/* ---------- masthead: the mark and the three steps ---------- */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 40px;
+  padding-bottom: 18px;
+  margin-bottom: 44px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--pipe);
+  text-decoration: none;
+}
+.brand:hover { color: var(--pipe); }
+
+.mark { width: 46px; height: 28px; flex: none; }
+.mark-pipe { fill: var(--pipe); }
+.mark-bore { fill: #3A4652; }
+.mark-stripe { fill: var(--stripe); }
+
+.brand-company {
+  display: block;
+  font-size: var(--t-small);
+  color: var(--quiet);
+  line-height: 1.2;
+}
+.brand-tool {
+  display: block;
+  font-size: var(--t-h3);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.steps {
+  display: flex;
+  gap: 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  font-size: var(--t-small);
+  color: var(--quiet);
+}
+.steps li {
+  counter-increment: step;
+  padding-bottom: 6px;
+  border-bottom: 3px solid transparent;
+}
+.steps li::before { content: counter(step) "  "; white-space: pre; }
+.steps li.done { color: var(--pipe); }
+.steps li[aria-current="step"] {
+  color: var(--pipe);
+  font-weight: 600;
+  border-bottom-color: var(--stripe);
+}
+
+/* ---------- text ---------- */
+
+h1 {
+  margin: 0 0 10px;
+  font-size: var(--t-h1);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+h2 {
+  margin: 0 0 6px;
+  font-size: var(--t-h3);
+  font-weight: 600;
+}
+.lead {
+  max-width: 62ch;
+  margin: 0 0 32px;
+  color: var(--quiet);
+}
+.lead strong { color: var(--pipe); font-weight: 600; }
+.quiet { color: var(--quiet); }
+
+.notice {
+  margin: 0 0 24px;
+  padding: 12px 16px;
+  border-left: 3px solid;
+}
+.notice.stop { color: var(--stop); background: var(--stop-bg); border-color: var(--stop); }
+
+/* ---------- step 1: the two registers ---------- */
+
+.files {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.file {
+  position: relative;
+  display: block;
+  padding: 18px 20px 20px;
+  background: var(--sheet);
+  border: 1px dashed var(--rule);
+  cursor: pointer;
+}
+.file:hover, .file.over { border-color: var(--stripe); }
+.file:focus-within { outline: 3px solid var(--stripe); outline-offset: 2px; }
+.file.chosen { border-style: solid; border-color: var(--pipe); }
+
+.file-title { display: block; font-size: var(--t-h3); font-weight: 600; }
+.file-help { display: block; font-size: var(--t-small); color: var(--quiet); margin-bottom: 14px; }
+.file-name {
+  display: block;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+  color: var(--quiet);
+  overflow-wrap: anywhere;
+}
+.file.chosen .file-name { color: var(--pipe); }
+
+/* the real input covers the box, so clicking and dropping a file both work */
+.file input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ---------- buttons ---------- */
+
+.primary {
+  display: inline-block;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--stripe);
+  color: #fff;
+  font: 600 var(--t-body)/1.2 var(--font);
+  text-decoration: none;
+  cursor: pointer;
+}
+.primary:hover { background: var(--stripe-dark); color: #fff; }
+.primary:disabled { background: var(--rule); color: var(--quiet); cursor: default; }
+
+/* ---------- step 2: entries table ---------- */
+
+.entries {
+  width: 100%;
+  margin-bottom: 28px;
+  border-collapse: collapse;
+  background: var(--sheet);
+  font-stretch: condensed;
+}
+.entries th, .entries td {
+  padding: 9px 10px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--rule);
+}
+.entries thead th {
+  font-size: var(--t-small);
+  font-weight: 400;
+  color: var(--quiet);
+  border-bottom: 2px solid var(--pipe);
+  background: var(--paper);
+}
+.entries .num { text-align: right; white-space: nowrap; }
+.entries .nowrap { white-space: nowrap; }
+.entries .tick { width: 36px; text-align: center; }
+.entries input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--stripe); }
+
+.entries tr.grade th {
+  padding-top: 18px;
+  font-size: var(--t-h3);
+  font-weight: 600;
+  background: var(--paper);
+  border-bottom: 1px solid var(--pipe);
+}
+
+.report-no {
+  width: 9em;
+  padding: 5px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font: inherit;
+  color: inherit;
+}
+.report-no:focus { border-color: var(--stripe); outline: none; box-shadow: 0 0 0 2px var(--stripe); }
+
+.entries tr.has-note td { border-bottom: 0; }
+.entries tr.note td {
+  padding-top: 0;
+  font-size: var(--t-small);
+  color: var(--caution);
+}
+.entries tr.note td:last-child::before { content: "Note: "; font-weight: 600; }
+
+.entries tr.off td { color: var(--quiet); }
+.entries tr.off .report-no { opacity: .45; }
+
+.choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 0 0 28px;
+  padding: 0;
+  border: 0;
+}
+.choice legend { padding: 0; margin-bottom: 8px; font-weight: 600; }
+.choice label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.choice input { accent-color: var(--stripe); width: 16px; height: 16px; }
+
+.skipped {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+.skipped ul { margin: 10px 0 0; padding-left: 18px; }
+.skipped li { margin-bottom: 6px; color: var(--stop); }
+.skipped li strong { color: var(--pipe); font-weight: 600; }
+
+.again { margin-top: 36px; }
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 640px) {
+  body { padding: 24px 16px 60px; }
+  .files { grid-template-columns: 1fr; }
+  .steps { gap: 16px; }
+  .entries { display: block; overflow-x: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

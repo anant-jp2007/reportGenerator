@@ -112,6 +112,20 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
   A1:L42 so the signature isn't cut off.
 - The PN line's underline running under "Kgs/Cm²" to the right border is as in the original Excel (user OK).
 
+## Website (Step 7, 2026-10-30)
+
+- Start with `Start.bat` (installs the libraries the first time, opens the browser at http://127.0.0.1:5050).
+  Only this computer can open it; no internet needed. Design notes: `docs/web-design.md`.
+- Screens: choose files (old + new register) → check entries → download.
+- Check entries: new entries grouped PE 63 → PE 80 → PE 100, each with a tick box and an editable Report No.
+  (pre-filled 1, 2, 3…; any text is allowed, e.g. "BPP63/EX001"; digits are stored as a number).
+  Notes under an entry when its report is still made (SDR taken from PN, empty batch); entries that can't
+  get a certificate are listed below with the reason; unreadable sheets shown at the top.
+- Download: a ZIP, with a file per certificate or all in one workbook. Every download is also saved in
+  `output/<date time>/`. Uploaded registers are kept in `uploads/` for a day, then deleted.
+- Both files are required. Uploading the same file twice shows "No new entries" with a hint about swapped files.
+- Only Excel for now; PDF and Word are added in Steps 8–9.
+
 ## Random ranges (approved)
 
 | Value | Range | Decimals |

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Check entries{% endblock %}
+{% block main %}
+<div id="review">
+  <h1>{% if total %}{{ total }} new {{ "entry" if total == 1 else "entries" }} to certify{% else %}No new entries{% endif %}</h1>
+  <p class="lead">Compared <strong>{{ names.old }}</strong> with <strong>{{ names.new }}</strong>.
+    {% if total %}Untick any entry you don't want, change a Report No. if needed, then download.{% endif %}</p>
+
+  {% for e in errors %}<p class="notice stop" role="alert">{{ e }}</p>{% endfor %}
+
+  {% if total %}
+  <form id="make" method="post" action="{{ url_for('download') }}">
+    <input type="hidden" name="token" value="{{ token }}">
+    <table class="entries">
+      <thead>
+        <tr>
+          <th class="tick"><input type="checkbox" id="all" checked aria-label="Tick all entries"></th>
+          <th>Report No.</th>
+          <th class="num">Sr.</th>
+          <th>Date</th>
+          <th>Size</th>
+          <th>Batch</th>
+          <th>File</th>
+        </tr>
+      </thead>
+      {% for g in groups if g.rows %}
+      <tbody>
+        <tr class="grade"><th colspan="7" scope="rowgroup">{{ g.grade }}</th></tr>
+        {% for r, number in g.rows %}
+        {% set id = row_id(r) %}
+        <tr class="entry{% if r.warnings %} has-note{% endif %}">
+          <td class="tick"><input type="checkbox" name="row" value="{{ id }}" checked aria-label="Make certificate for Sr. {{ r.sr_no }}"></td>
+          <td><input class="report-no" name="no-{{ id }}" value="{{ number }}" aria-label="Report No. for Sr. {{ r.sr_no }}"></td>
+          <td class="num">{{ r.sr_no }}</td>
+          <td class="nowrap">{{ r.date.strftime('%d-%m-%Y') }}</td>
+          <td>{{ r.size_text }}</td>
+          <td class="nowrap">{{ r.batch or "–" }}</td>
+          <td class="quiet">{{ (r.report_no or (r.grade.replace(' ', '') ~ '-row' ~ r.excel_row)).replace('/', '-') }}.xlsx</td>
+        </tr>
+        {% if r.warnings %}
+        <tr class="note"><td></td><td colspan="6">{% for w in r.warnings %}{{ w[0]|upper }}{{ w[1:] }}.{% if not loop.last %} {% endif %}{% endfor %}</td></tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+      {% endfor %}
+    </table>
+
+    <fieldset class="choice">
+      <legend>Files</legend>
+      <label><input type="radio" name="files" value="each" checked> A file for each certificate</label>
+      <label><input type="radio" name="files" value="one"> All certificates in one file</label>
+    </fieldset>
+
+    <button class="primary" type="submit" id="go">Download {{ total }} {{ "certificate" if total == 1 else "certificates" }}</button>
+  </form>
+  {% else %}
+  <p>Every entry in the new register was already in the old one. If you expected new entries, check that the
+    files aren't swapped: the old register goes on the left.</p>
+  {% endif %}
+
+  {% set skipped = groups|map(attribute='skipped')|sum(start=[]) %}
+  {% if skipped %}
+  <section class="skipped">
+    <h2>No certificate for {{ skipped|length }} {{ "entry" if skipped|length == 1 else "entries" }}</h2>
+    <p class="quiet">Correct these in the register and choose the files again.</p>
+    <ul>
+      {% for r in skipped %}
+      <li><strong>{{ r.grade }}, row {{ r.excel_row }}</strong> (Sr. {{ r.sr_no }}, {{ r.size_text }}): {{ r.problems|join('; ') }}.</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if notes %}
+  <section class="skipped">
+    <h2>Rows not read</h2>
+    <ul>{% for n in notes %}<li>{{ n }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  <p class="again"><a href="{{ url_for('choose_files') }}">Choose other files</a></p>
+</div>
+
+<div id="done" hidden>
+  <h1 id="done-title">Certificates downloaded</h1>
+  <p class="lead" id="done-text"></p>
+  <p><a class="primary" href="{{ url_for('choose_files') }}">Make more certificates</a></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var form = document.getElementById("make");
+  if (!form) return;
+  var all = document.getElementById("all"), go = document.getElementById("go");
+  var boxes = Array.prototype.slice.call(form.querySelectorAll("input[name=row]"));
+
+  function count() {
+    var n = boxes.filter(function (b) { return b.checked; }).length;
+    go.textContent = n ? "Download " + n + (n === 1 ? " certificate" : " certificates") : "Tick an entry to download";
+    go.disabled = !n;
+    all.checked = n === boxes.length;
+    all.indeterminate = n > 0 && n < boxes.length;
+    boxes.forEach(function (b) { b.closest("tr").classList.toggle("off", !b.checked); });
+  }
+  all.addEventListener("change", function () { boxes.forEach(function (b) { b.checked = all.checked; }); count(); });
+  boxes.forEach(function (b) { b.addEventListener("change", count); });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var label = go.textContent;
+    go.disabled = true; go.textContent = "Making certificates…";
+    fetch(form.action, { method: "POST", body: new FormData(form) }).then(function (res) {
+      if (!res.ok) return res.text().then(function (html) { document.open(); document.write(html); document.close(); });
+      var n = res.headers.get("X-Certificates"), where = res.headers.get("X-Saved-To");
+      var name = (res.headers.get("Content-Disposition") || "").match(/filename="?([^";]+)"?/);
+      return res.blob().then(function (blob) {
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = name ? name[1] : "Test certificates.zip";
+        document.body.appendChild(a); a.click(); a.remove();
+        document.getElementById("done-title").textContent = n + (n === "1" ? " certificate downloaded" : " certificates downloaded");
+        document.getElementById("done-text").textContent =
+          "The ZIP file is in your Downloads folder. A copy is also saved in " + where;
+        document.getElementById("review").hidden = true;
+        document.getElementById("done").hidden = false;
+        var steps = document.querySelectorAll(".steps li");
+        steps[1].removeAttribute("aria-current"); steps[1].classList.add("done");
+        steps[2].setAttribute("aria-current", "step");
+        window.scrollTo(0, 0);
+      });
+    }).catch(function () {
+      go.disabled = false; go.textContent = label;
+      alert("The app stopped responding. Check that its black window is still open, then try again.");
+    });
+  });
+  count();
+})();
+</script>
+{% endblock %}

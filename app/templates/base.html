@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Test certificates{% endblock %} – {{ company }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='mark.svg') }}">
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="{{ url_for('choose_files') }}">
+      <svg class="mark" viewBox="0 0 40 24" aria-hidden="true">
+        <path class="mark-pipe" d="M4 3h29a7 9 0 0 1 0 18H4z"/>
+        <ellipse class="mark-bore" cx="33" cy="12" rx="4.2" ry="6.4"/>
+        <rect class="mark-stripe" x="4" y="6" width="25" height="1.6"/>
+        <rect class="mark-stripe" x="4" y="11.2" width="25" height="1.6"/>
+        <rect class="mark-stripe" x="4" y="16.4" width="25" height="1.6"/>
+      </svg>
+      <span>
+        <span class="brand-company">{{ company }}</span>
+        <span class="brand-tool">Test certificates</span>
+      </span>
+    </a>
+    <ol class="steps" aria-label="Steps">
+      {% for label in ["Choose files", "Check entries", "Download"] %}
+      <li{% if loop.index == step %} aria-current="step"{% elif loop.index < step %} class="done"{% endif %}>{{ label }}</li>
+      {% endfor %}
+    </ol>
+  </header>
+  <main>
+    {% block main %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

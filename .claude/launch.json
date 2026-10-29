@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "certificates",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "app.web", "--no-browser"],
+      "port": 5050
+    }
+  ]
+}

@@ -31,7 +31,7 @@ class Cell:
 
 @dataclass
 class Report:
-    number: int
+    number: int | str
     row: Row
     file_name: str                       # without extension
     cells: dict[str, Cell]
@@ -99,7 +99,7 @@ def pipe_end_range(conf: dict, chart_max: float) -> tuple[float, float]:
 
 # ---------- building one report ----------
 
-def build_report(row: Row, number: int, settings: dict | None = None,
+def build_report(row: Row, number: int | str, settings: dict | None = None,
                  rng: random.Random | None = None) -> Report:
     if not row.ok:
         raise ValueError(f"{row.where()}: {'; '.join(row.problems)}")
@@ -130,7 +130,9 @@ def build_report(row: Row, number: int, settings: dict | None = None,
     made = row.date
     start = made + timedelta(days=rep["testing_start_days_after_manufacturing"])
     end = start + timedelta(days=rep["testing_end_days_after_start"])
-    put(hc["report_no"], number, str(number))
+    # the report no. may be typed by the user on the review screen ("BPP100/EX008"); digits stay a number
+    number_text = str(number).strip()
+    put(hc["report_no"], int(number_text) if number_text.isdigit() else number_text, number_text)
     for key, d in (("date_of_manufacturing", made), ("testing_start", start), ("testing_end", end)):
         put(hc[key], d, fmt_date(d, rep["date_format"]))
     put(hc["batch"], row.batch)

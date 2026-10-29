@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block main %}
+<h1>Make test certificates for new entries</h1>
+<p class="lead">Choose the production register you last made certificates from, and the register as it is now.
+  Only entries added since then get a certificate.</p>
+
+{% if error %}<p class="notice stop" role="alert">{{ error }}</p>{% endif %}
+
+<form class="choose" method="post" action="{{ url_for('check_entries') }}" enctype="multipart/form-data">
+  <div class="files">
+    <label class="file">
+      <span class="file-title">Old register</span>
+      <span class="file-help">The copy from last time</span>
+      <span class="file-name" data-empty="No file chosen">No file chosen</span>
+      <input type="file" name="old" accept=".xls,.xlsx" required>
+    </label>
+    <label class="file">
+      <span class="file-title">New register</span>
+      <span class="file-help">With today's entries</span>
+      <span class="file-name" data-empty="No file chosen">No file chosen</span>
+      <input type="file" name="new" accept=".xls,.xlsx" required>
+    </label>
+  </div>
+  <button class="primary" type="submit">Find new entries</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll(".file").forEach(function (box) {
+    var input = box.querySelector("input"), name = box.querySelector(".file-name");
+    input.addEventListener("change", function () {
+      var f = input.files[0];
+      name.textContent = f ? f.name : name.dataset.empty;
+      box.classList.toggle("chosen", !!f);
+    });
+    ["dragenter", "dragover"].forEach(function (t) {
+      box.addEventListener(t, function () { box.classList.add("over"); });
+    });
+    ["dragleave", "drop"].forEach(function (t) {
+      box.addEventListener(t, function () { box.classList.remove("over"); });
+    });
+  });
+  document.querySelector("form.choose").addEventListener("submit", function (e) {
+    var b = e.target.querySelector("button");
+    b.disabled = true; b.textContent = "Reading the registers…";
+  });
+</script>
+{% endblock %}
