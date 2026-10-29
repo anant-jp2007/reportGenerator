@@ -102,6 +102,16 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 - If two reports in one run would get the same file name (e.g. MP63/007 exists in 2024 and 2025),
   the second becomes `MP63-007-2`.
 
+## Excel output (Step 6, 2026-10-30)
+
+- Filled from `templates/test_report.xlsx`; all formatting kept. Numbers stored as numbers with a format
+  matching the printed decimals; dates stored as dates and always shown dd-mm-yyyy with dashes.
+- One file per report, or one combined workbook with a sheet per report ("1. MP63-171", ...).
+- Page: A4, one page, centred horizontally (left/right margins 0.4"; the sample had 0.59"/0" and printed off-centre).
+- **User decision:** "Tested by :-" is on the **right** (G39:I39), the signature right after it. Print area
+  A1:L42 so the signature isn't cut off.
+- The PN line's underline running under "Kgs/Cm²" to the right border is as in the original Excel (user OK).
+
 ## Random ranges (approved)
 
 | Value | Range | Decimals |

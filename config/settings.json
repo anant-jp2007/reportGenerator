@@ -96,7 +96,7 @@
 
   "signature": {
     "file": "assets/signature.png",
-    "next_to": "B39"
+    "next_to": "G39"
   },
 
   "fixed_text": {
@@ -180,6 +180,6 @@
     "C37": "Yield Strength",
     "D37": "Shall not be less than 15 MPa ", "J37": "MPa",
 
-    "B39": "Tested by :-"
+    "G39": "Tested by :-"
   }
 }

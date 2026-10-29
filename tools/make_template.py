@@ -7,6 +7,7 @@ one-page A4 printing. Formatting (fonts, borders, merges, superscripts) is kept.
     python tools/make_template.py [sample.xlsx] [output.xlsx]
 """
 import sys
+from copy import copy
 from pathlib import Path
 
 import openpyxl
@@ -47,7 +48,19 @@ def main():
         ws[ref].number_format = "General"
     ws["D11"].number_format = "@"  # batch is text; the sample had a date format here
 
-    ws.print_area = "A1:L40"
+    # "Tested by :-" moves from the left (B39:C39) to the right (G39:I39); the signature goes after it
+    label = ws["B39"]
+    font, align = copy(label.font), copy(label.alignment)
+    ws.unmerge_cells("B39:C39")
+    label.value = None
+    ws.merge_cells("G39:I39")
+    ws["G39"].value = "Tested by :-"
+    ws["G39"].font, ws["G39"].alignment = font, align
+
+    ws.print_area = "A1:L42"   # two spare rows below "Tested by :-" so the signature isn't cut off
+    # centred on the page: the sample had left margin 0.59" and right 0", so it sat off to the right
+    ws.page_margins.left = ws.page_margins.right = 0.4
+    ws.print_options.horizontalCentered = True
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_setup.orientation = "portrait"
     ws.sheet_properties.pageSetUpPr.fitToPage = True
