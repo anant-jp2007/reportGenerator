@@ -40,14 +40,14 @@ def validate(s: dict) -> list[str]:
             used_cells[cell] = what
 
     company = s.get("company", {})
-    profile = company.get("profiles", {}).get(company.get("selected"))
-    if profile is None:
+    if company.get("selected") not in company.get("profiles", {}):
         problems.append(f"company: selected profile '{company.get('selected')}' not found")
-    else:
+    for cid, profile in company.get("profiles", {}).items():
         for cell in ("A1", "A2", "A3", "A4", "A5"):
             if not str(profile.get(cell, "")).strip():
-                problems.append(f"company '{company['selected']}': {cell} is empty")
-            use(cell, f"company {cell}")
+                problems.append(f"company '{cid}': {cell} is empty")
+    for cell in ("A1", "A2", "A3", "A4", "A5"):
+        use(cell, f"company {cell}")
 
     rep = s.get("report", {})
     if set(rep.get("grade_order", [])) != {"PE 63", "PE 80", "PE 100"}:
@@ -116,5 +116,21 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
     return s
 
 
-def company_profile(s: dict) -> dict:
-    return s["company"]["profiles"][s["company"]["selected"]]
+def company_profile(s: dict, company_id: str | None = None) -> dict:
+    """The header cells (A1-A5) of a company; the selected one unless an id is given."""
+    profile = s["company"]["profiles"][company_id or s["company"]["selected"]]
+    return {k: v for k, v in profile.items() if CELL_RE.match(k)}
+
+
+def companies(s: dict) -> list[tuple[str, str]]:
+    """(id, name shown in the company menu), default company first."""
+    profiles = s["company"]["profiles"]
+    order = [s["company"]["selected"]] + [k for k in profiles if k != s["company"]["selected"]]
+    return [(k, profiles[k].get("name") or profiles[k]["A1"]) for k in order]
+
+
+def with_company(s: dict, company_id: str) -> dict:
+    """A copy of the settings with another company selected."""
+    if company_id not in s["company"]["profiles"]:
+        raise SettingsError(f"company '{company_id}' not found")
+    return {**s, "company": {**s["company"], "selected": company_id}}

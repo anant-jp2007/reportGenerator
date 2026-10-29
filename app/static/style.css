@@ -69,17 +69,17 @@ a:hover { color: var(--stripe-dark); }
 .mark-bore { fill: #3A4652; }
 .mark-stripe { fill: var(--stripe); }
 
-.brand-company {
-  display: block;
-  font-size: var(--t-small);
-  color: var(--quiet);
-  line-height: 1.2;
-}
 .brand-tool {
   display: block;
   font-size: var(--t-h3);
   font-weight: 600;
   line-height: 1.2;
+}
+.brand-sub {
+  display: block;
+  font-size: var(--t-small);
+  color: var(--quiet);
+  line-height: 1.3;
 }
 
 .steps {
@@ -134,7 +134,25 @@ h2 {
 }
 .notice.stop { color: var(--stop); background: var(--stop-bg); border-color: var(--stop); }
 
-/* ---------- step 1: the two registers ---------- */
+/* ---------- step 1: company and the two registers ---------- */
+
+.company {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.company-label { font-weight: 600; }
+.company select {
+  min-width: 16em;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--sheet);
+  color: var(--pipe);
+  font: inherit;
+}
+.company select:focus { border-color: var(--stripe); outline: none; box-shadow: 0 0 0 2px var(--stripe); }
 
 .files {
   display: grid;

@@ -7,6 +7,14 @@
 {% if error %}<p class="notice stop" role="alert">{{ error }}</p>{% endif %}
 
 <form class="choose" method="post" action="{{ url_for('check_entries') }}" enctype="multipart/form-data">
+  <label class="company">
+    <span class="company-label">Company</span>
+    <select name="company" required>
+      {% for id, name in companies %}
+      <option value="{{ id }}"{% if id == chosen %} selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </label>
   <div class="files">
     <label class="file">
       <span class="file-title">Old register</span>

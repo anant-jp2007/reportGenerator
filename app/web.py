@@ -24,7 +24,7 @@ from flask import Flask, abort, render_template, request, send_file
 from app.production import GRADE_ORDER, find_new_rows
 from app.render_excel import write_excel, write_excel_combined
 from app.report import build_report
-from app.settings import SettingsError, company_profile, load_settings
+from app.settings import SettingsError, companies, load_settings, with_company
 
 ROOT = Path(__file__).resolve().parent.parent
 UPLOADS = ROOT / "uploads"
@@ -67,16 +67,16 @@ def _files(d: Path) -> tuple[Path, Path]:
     return old, new
 
 
-def _company():
+def _companies():
     try:
-        return company_profile(load_settings())["A1"]
+        return companies(load_settings())
     except SettingsError:
-        return "Test certificates"
+        return []
 
 
 @app.get("/")
 def choose_files():
-    return render_template("upload.html", step=1, company=_company(), error=None)
+    return render_template("upload.html", step=1, companies=_companies(), chosen=None, error=None)
 
 
 @app.post("/check")
@@ -85,11 +85,16 @@ def check_entries():
     files = {k: request.files.get(k) for k in ("old", "new")}
     missing = [label for k, label in (("old", "old register"), ("new", "new register"))
                if not files[k] or not files[k].filename]
+    company = request.form.get("company", "")
+    names_by_id = dict(_companies())
+    if company not in names_by_id:
+        return _upload_error("Choose the company the certificates are for.")
     if missing:
-        return _upload_error(f"Choose the {' and the '.join(missing)}.")
+        return _upload_error(f"Choose the {' and the '.join(missing)}.", company)
     for k, f in files.items():
         if Path(f.filename).suffix.lower() not in ALLOWED:
-            return _upload_error(f"'{f.filename}' isn't an Excel file. Choose the .xls or .xlsx production register.")
+            return _upload_error(f"'{f.filename}' isn't an Excel file. Choose the .xls or .xlsx production register.",
+                                 company)
 
     token = secrets.token_hex(8)
     d = UPLOADS / token
@@ -98,22 +103,22 @@ def check_entries():
     for k, f in files.items():
         f.save(d / f"{k}{Path(f.filename).suffix.lower()}")
         names[k] = f.filename
-    (d / "names.txt").write_text(f"{names['old']}\n{names['new']}", encoding="utf-8")
+    (d / "company.txt").write_text(company, encoding="utf-8")
 
     try:
         diff = find_new_rows(*_files(d))
     except Exception as e:   # unreadable / corrupt workbook
         shutil.rmtree(d, ignore_errors=True)
         return _upload_error(f"One of the files couldn't be opened as an Excel register ({e}). "
-                             "Open it in Excel, save it again and choose it here.")
-    return _review(token, names, diff)
+                             "Open it in Excel, save it again and choose it here.", company)
+    return _review(token, names, names_by_id[company], diff)
 
 
-def _upload_error(message):
-    return render_template("upload.html", step=1, company=_company(), error=message), 400
+def _upload_error(message, company=None):
+    return render_template("upload.html", step=1, companies=_companies(), chosen=company, error=message), 400
 
 
-def _review(token, names, diff):
+def _review(token, names, company_name, diff):
     groups = []
     number = load_settings()["report"]["number_starts_at"]
     for grade in GRADE_ORDER:
@@ -125,7 +130,7 @@ def _review(token, names, diff):
                 number += 1
         groups.append({"grade": grade, "rows": good,
                        "skipped": [r for r in rows if not r.ok]})
-    return render_template("review.html", step=2, company=_company(), token=token, names=names,
+    return render_template("review.html", step=2, company_name=company_name, token=token, names=names,
                            groups=groups, errors=diff.errors, notes=diff.notes,
                            total=sum(len(g["rows"]) for g in groups), row_id=row_id)
 
@@ -139,6 +144,7 @@ def download():
         abort(400, "Tick at least one entry.")
     combined = request.form.get("files") == "one"
 
+    settings = with_company(load_settings(), (d / "company.txt").read_text(encoding="utf-8"))
     diff = find_new_rows(*_files(d))
     by_id = {row_id(r): r for r in diff.new if r.ok}
     reports = []
@@ -147,7 +153,7 @@ def download():
         if row is None:
             abort(400, "An entry is no longer in the register. Choose the files again.")
         number = request.form.get(f"no-{rid}", "").strip() or str(len(reports) + 1)
-        reports.append(build_report(row, number))
+        reports.append(build_report(row, number, settings))
     _unique_names(reports)
 
     stamp = datetime.now().strftime("%Y-%m-%d %H%M%S")
@@ -182,7 +188,7 @@ def _unique_names(reports):
 @app.errorhandler(400)
 @app.errorhandler(410)
 def bad_request(e):
-    return render_template("upload.html", step=1, company=_company(),
+    return render_template("upload.html", step=1, companies=_companies(), chosen=None,
                            error=getattr(e, "description", None) or "Something was missing. Choose the files again."), e.code
 
 

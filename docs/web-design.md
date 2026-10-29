@@ -29,10 +29,12 @@ Scale (1.25): 13 / 15 / 18 / 23 / 29 px. Body 15/1.5.
 One left-aligned column, max 860px, generous top margin. No cards, no shadows: content sits on rules.
 
 ```
-[|||] Balaji Polyplast
-      Test certificates
+[pipe] Test certificates
+       HDPE pipes, IS 4984
 
 Choose files      Check entries      Download       <- the three steps, current one in Stripe blue
+
+Company [ Balaji Polyplast  v ]
 
 ┌ Old register ──────────┐  ┌ New register ──────────┐
 │ PRODUCTION (old).xls   │  │ PRODUCTION (2).xls     │
@@ -42,6 +44,8 @@ Choose files      Check entries      Download       <- the three steps, current 
 
 Review: one table, grouped by grade with the grade as a plain row heading, a tick box and an editable report
 number per row, warnings as a second line under the row. Skipped rows listed below the table with the reason.
+
+- The header never names a company: the app may serve several. The company is a choice on the first screen.
 
 ## Principles
 - **The one bold thing:** three thin blue stripes, the pipe's identification stripes, as the mark and as the step

@@ -8,9 +8,11 @@
   ],
 
   "company": {
+    "_help": "One profile per company. 'selected' is the default in the website's Company menu. To add a company, copy the balaji block, give it a new id and change name and A1-A5.",
     "selected": "balaji",
     "profiles": {
       "balaji": {
+        "name": "Balaji Polyplast",
         "A1": "BALAJI POLYPLAST",
         "A2": "(An ISO 9001:2000 Company )",
         "A3": "Survey No. 693, Plot No.1, Rajkot - Jamnagar Highway, Nr. Jivil Polytech",

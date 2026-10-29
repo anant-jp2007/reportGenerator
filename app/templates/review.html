@@ -3,7 +3,7 @@
 {% block main %}
 <div id="review">
   <h1>{% if total %}{{ total }} new {{ "entry" if total == 1 else "entries" }} to certify{% else %}No new entries{% endif %}</h1>
-  <p class="lead">Compared <strong>{{ names.old }}</strong> with <strong>{{ names.new }}</strong>.
+  <p class="lead">For <strong>{{ company_name }}</strong>. Compared <strong>{{ names.old }}</strong> with <strong>{{ names.new }}</strong>.
     {% if total %}Untick any entry you don't want, change a Report No. if needed, then download.{% endif %}</p>
 
   {% for e in errors %}<p class="notice stop" role="alert">{{ e }}</p>{% endfor %}

@@ -116,7 +116,12 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 
 - Start with `Start.bat` (installs the libraries the first time, opens the browser at http://127.0.0.1:5050).
   Only this computer can open it; no internet needed. Design notes: `docs/web-design.md`.
-- Screens: choose files (old + new register) → check entries → download.
+- Screens: choose files (company + old + new register) → check entries → download.
+- **User decision:** the app isn't titled after a company ("Test certificates, HDPE pipes, IS 4984"),
+  because it may make certificates for other companies too. A **Company** menu on the first screen lists
+  every profile in `config/settings.json` (default first); the chosen company's rows 1–5 go on the
+  certificates, everything else stays the same. To add a company: copy the `balaji` profile, give it a new
+  id, change `name` and A1–A5.
 - Check entries: new entries grouped PE 63 → PE 80 → PE 100, each with a tick box and an editable Report No.
   (pre-filled 1, 2, 3…; any text is allowed, e.g. "BPP63/EX001"; digits are stored as a number).
   Notes under an entry when its report is still made (SDR taken from PN, empty batch); entries that can't

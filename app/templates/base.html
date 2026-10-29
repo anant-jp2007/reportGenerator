@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Test certificates{% endblock %} – {{ company }}</title>
+  <title>{% block title %}Test certificates{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='mark.svg') }}">
 </head>
@@ -18,8 +18,8 @@
         <rect class="mark-stripe" x="4" y="16.4" width="25" height="1.6"/>
       </svg>
       <span>
-        <span class="brand-company">{{ company }}</span>
         <span class="brand-tool">Test certificates</span>
+        <span class="brand-sub">HDPE pipes, IS 4984</span>
       </span>
     </a>
     <ol class="steps" aria-label="Steps">
