@@ -1,6 +1,7 @@
 """Build two sample production registers for trying the app: before (4 entries) and after (10).
 
-    python tools/make_sample_registers.py      -> samples/PRODUCTION before.xlsx, samples/PRODUCTION after.xlsx
+    python tools/make_sample_registers.py [folder]   -> PRODUCTION before.xlsx, PRODUCTION after.xlsx
+                                                        (default folder: samples/)
 
 Same layout as the real register: sheets "Production 63/80/100", title row, headings in row 2,
 month rows, TOTAL rows, and pre-typed report numbers on empty rows.
@@ -123,11 +124,14 @@ def build(entries, path):
     print(path)
 
 
-def main():
-    build(BEFORE, OUT / "PRODUCTION before.xlsx")
+def make(out_dir: Path = OUT) -> tuple[Path, Path]:
+    """Write both registers into out_dir; returns (before, after)."""
+    before, after_path = Path(out_dir) / "PRODUCTION before.xlsx", Path(out_dir) / "PRODUCTION after.xlsx"
+    build(BEFORE, before)
     after = [(g, sr, d, s, b, EDITED_IN_AFTER.get((g, sr), m), rem) for g, sr, d, s, b, m, rem in BEFORE] + NEW
-    build(after, OUT / "PRODUCTION after.xlsx")
+    build(after, after_path)
+    return before, after_path
 
 
 if __name__ == "__main__":
-    main()
+    make(Path(sys.argv[1]) if len(sys.argv) > 1 else OUT)

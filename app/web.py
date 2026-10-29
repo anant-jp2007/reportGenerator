@@ -165,21 +165,22 @@ def download():
     _unique_names(reports)
 
     stamp = datetime.now().strftime("%Y-%m-%d %H%M%S")
-    out = OUTPUT / stamp
+    out = _new_folder(OUTPUT / stamp)      # two downloads in the same second get separate folders
     writers = {"excel": (".xlsx", write_excel, write_excel_combined),
                "pdf": (".pdf", write_pdf, write_pdf_combined),
                "word": (".docx", write_word, write_word_combined)}
+    made = []
     for fmt in formats:
         ext, one, many = writers[fmt]
         if combined:
-            many(reports, out / f"Test certificates {stamp[:10]}{ext}")
+            made.append(many(reports, out / f"Test certificates {stamp[:10]}{ext}"))
         else:
             for rep in reports:
-                one(rep, out / f"{rep.file_name}{ext}")
+                made.append(one(rep, out / f"{rep.file_name}{ext}"))
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in sorted(out.iterdir()):
+        for f in sorted(made, key=lambda p: p.name):     # only this download's files
             z.write(f, f.name)
     buf.seek(0)
     resp = send_file(buf, mimetype="application/zip", as_attachment=True,
@@ -187,6 +188,17 @@ def download():
     resp.headers["X-Certificates"] = str(len(reports))
     resp.headers["X-Saved-To"] = str(out)
     return resp
+
+
+def _new_folder(path: Path) -> Path:
+    """path, or path (2), path (3)... if it already exists; created empty."""
+    candidate, n = path, 2
+    while True:
+        try:
+            candidate.mkdir(parents=True)
+            return candidate
+        except FileExistsError:
+            candidate, n = path.with_name(f"{path.name} ({n})"), n + 1
 
 
 def _unique_names(reports):
