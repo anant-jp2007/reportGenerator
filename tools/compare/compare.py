@@ -1,6 +1,7 @@
 """Make one report as Excel (exported to PDF by Excel) and as our PDF; overlay both pages."""
 import sys, subprocess, random
-sys.path.insert(0, r"E:\PROjectssss")
+ROOT = __import__("pathlib").Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 import pymupdf as fitz
 from PIL import Image, ImageChops
 from app.production import read_production
@@ -8,7 +9,7 @@ from app.report import build_report
 from app.render_excel import write_excel
 from app.render_pdf import write_pdf
 SP = sys.argv[1]
-rows = read_production(r"E:\PROjectssss\data\source\production_sample.xls").rows
+rows = read_production(ROOT / "data/source/production_sample.xls").rows
 row = next(r for r in rows if r.grade == "PE 100" and r.excel_row == 53)
 rep = build_report(row, 3, rng=random.Random(7))
 write_excel(rep, f"{SP}/cmp.xlsx"); write_pdf(rep, f"{SP}/mine.pdf")
