@@ -69,7 +69,8 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 
 - The weight chart file disagrees with itself on **pipe end** for OD 75, 125 and 180:
   main sheet and "Page - 02" say 2 / 3 / 4, "Page - 01" says 3 / 4 / 5. The issued sample
-  reports (75 → 2, 125 → 3) follow the main sheet, so the app uses the main sheet. Awaiting user confirmation.
+  reports (75 → 2, 125 → 3) follow the main sheet. **User confirmed: main sheet is correct** (75 = 2, 125 = 3, 180 = 4).
+  The importer reads only the main sheet; the print sheets are just cross-checked.
 - Template cells J8 / J9 / J10 had number format "0", which would print SDR 13.6 as 14 and
   PN 12.5 as 13. Changed to General in the app's template.
 - OD test values use steps of 0.1 mm (75.10, 315.50) like the samples, printed with 2 decimals.
