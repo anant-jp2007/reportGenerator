@@ -206,6 +206,49 @@ for r in book["Production 100"]:
 d = find_new_rows(old_same, save(book, "edited.xlsx"))
 check("edited old row is ignored (no new report)", not d.new, len(d.new))
 
+# new entries missing what the certificate needs: listed with the reason, never dropped silently
+book = copy_book(ORIGINAL)
+pe100 = book["Production 100"]
+r52, r53 = pe100[51], pe100[52]          # Sr 18 and 19 (rows 52, 53)
+r52[2] = None                            # size empty
+r53[1] = "31/02/2025"                    # impossible date
+old = save(blank(copy_book(ORIGINAL), "Production 100", [52, 53]), "old_missing.xlsx")
+d = find_new_rows(old, save(book, "new_missing.xlsx"))
+got = {r.sr_no: r.problems for r in d.new}
+check("new entry with empty size is listed: 'size is empty'", got.get(18) == ["size is empty"], got)
+bad = next(r for r in d.new if r.sr_no == 19)
+check("new entry with unreadable date: still certified, note says how to write it, dates blank",
+      bad.ok and bad.date is None and any("not readable" in w and "05-05-2025" in w for w in bad.warnings), bad.warnings)
+book = copy_book(ORIGINAL)
+book["Production 100"][52][1] = None     # date empty
+book["Production 100"][51][2] = "63"     # PN missing from the size
+d = find_new_rows(old, save(book, "new_missing2.xlsx"))
+got = {r.sr_no: r.problems for r in d.new}
+nodate = next(r for r in d.new if r.sr_no == 19)
+check("new entry with empty date: still certified with a note", nodate.ok and any("date is empty" in w for w in nodate.warnings),
+      nodate.warnings)
+check("new entry with PN missing ('63') is listed: size not understood",
+      got.get(18) and "not understood" in got[18][0], got)
+check("rows with only a Sr. No. (placeholders) still ignored", all(r.sr_no in (18, 19) for r in d.new), [r.sr_no for r in d.new])
+
+# the everyday case at scale: 10 rows added at the end and 31 earlier rows edited in the same file
+book = copy_book(ORIGINAL)
+pe63 = book["Production 63"]
+filled = [i for i, r in enumerate(pe63) if r and isinstance(r[0], float) and len(r) > 2 and r[2]]
+added = filled[-10:]                                  # the last 10 filled rows are the "new" ones
+old = save(blank(copy_book(ORIGINAL), "Production 63", [i + 1 for i in added]), "old_310.xlsx")
+for i in filled[19:50]:                               # rows 20-50 edited: meters, batch, remark
+    r = pe63[i]
+    r[5] = (r[5] or 0) + 100
+    r[4] = (r[4] or "") + "9"
+    r.extend([None] * (9 - len(r)))
+    r[8] = "corrected"
+d = find_new_rows(old, save(book, "new_310.xlsx"))
+want = [int(pe63[i][0]) for i in added]
+got = [r.sr_no for r in d.new]
+check("10 new rows found, none of the 31 edited rows (old register 300+ rows)",
+      got == want and len(d.new) == 10, (got, want))
+
 new_other_layout = save(rename_headings(add_title_row(insert_brand_column(copy_book(ORIGINAL))),
                                         {"S.No.": 0, "DATE": 1, "SIZE": 2, "Report No": 4, "BATCH NO": 5}), "new_layout.xlsx")
 old = save(blank(copy_book(ORIGINAL), "Production 100", [52, 53]), "old_2blank.xlsx")

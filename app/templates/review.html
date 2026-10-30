@@ -32,7 +32,7 @@
           <td class="tick"><input type="checkbox" name="row" value="{{ id }}" checked aria-label="Make certificate for Sr. {{ r.sr_no }}"></td>
           <td><input class="report-no" name="no-{{ id }}" value="{{ number }}" aria-label="Report No. for Sr. {{ r.sr_no }}"></td>
           <td class="num">{{ r.sr_no }}</td>
-          <td class="nowrap">{{ r.date.strftime('%d-%m-%Y') }}</td>
+          <td class="nowrap">{{ r.date.strftime('%d-%m-%Y') if r.date else "–" }}</td>
           <td>{{ r.size_text }}</td>
           <td class="nowrap">{{ r.batch or "–" }}</td>
           <td class="quiet">{{ (r.report_no or (r.grade.replace(' ', '') ~ '-row' ~ r.excel_row)).replace('/', '-') }}.xlsx</td>
@@ -73,7 +73,7 @@
     <p class="quiet">Correct these in the register and choose the files again.</p>
     <ul>
       {% for r in skipped %}
-      <li><strong>{{ r.grade }}, row {{ r.excel_row }}</strong> (Sr. {{ r.sr_no }}, {{ r.size_text }}): {{ r.problems|join('; ') }}.</li>
+      <li><strong>{{ r.grade }}, row {{ r.excel_row }}</strong> (Sr. {{ r.sr_no }}{% if r.size_text %}, {{ r.size_text }}{% endif %}{% if r.date %}, {{ r.date.strftime('%d-%m-%Y') }}{% endif %}): {{ r.problems|join('; ') }}.</li>
       {% endfor %}
     </ul>
   </section>

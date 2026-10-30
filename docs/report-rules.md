@@ -99,6 +99,9 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 - **User decision:** OD and wall thickness values obtained stay **strictly inside** the chart limits,
   never exactly on them (`strictly_inside` in settings). Every chart size/SDR is wide enough for this.
   For the narrowest OD ranges (0.3 mm, e.g. 32.00–32.30) this means the values are always 32.10 and 32.20.
+- **User decision:** obtained minimum and maximum must never look almost equal (3.24 / 3.25). The maximum is at least
+  25% of the chart range above the minimum for wall thickness, 20% for OD (`min_gap_fraction` in settings),
+  e.g. 63 mm SDR 21 wall (3.00–3.40): at least 0.10 apart. Every chart size/SDR has room for this.
 - If two reports in one run would get the same file name (e.g. MP63/007 exists in 2024 and 2025),
   the second becomes `MP63-007-2`.
 

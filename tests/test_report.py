@@ -82,12 +82,15 @@ for rep in reports:
          (tag, pe.text, sp.pipe_end))
 
     a, b = c["J24"].value, c["J25"].value
-    rule("OD obtained: strictly inside chart min-max (never on a limit), minimum < maximum, 0.1 steps, 2 decimals",
-         sp.od_min < a < b < sp.od_max and on_step(a, 0.1) and on_step(b, 0.1)
+    gap = RV["outside_diameter"]["min_gap_fraction"] * (sp.od_max - sp.od_min) - 1e-9
+    rule("OD obtained: strictly inside chart min-max, maximum >= minimum + 20% of the range, 0.1 steps, 2 decimals",
+         sp.od_min < a < b < sp.od_max and b - a >= gap and on_step(a, 0.1) and on_step(b, 0.1)
          and decimals_ok(c["J24"], 2), (tag, a, b, sp.od_min, sp.od_max))
     a, b = c["J26"].value, c["J27"].value
-    rule("wall obtained: strictly inside chart min-max (never on a limit), minimum < maximum, 2 decimals",
-         sp.wall_min < a < b < sp.wall_max and decimals_ok(c["J26"], 2), (tag, a, b, sp.wall_min, sp.wall_max))
+    gap = RV["wall_thickness"]["min_gap_fraction"] * (sp.wall_max - sp.wall_min) - 1e-9
+    rule("wall obtained: strictly inside chart min-max, maximum >= minimum + 25% of the range (never 3.24 / 3.25)",
+         sp.wall_min < a < b < sp.wall_max and b - a >= gap and decimals_ok(c["J26"], 2),
+         (tag, a, b, sp.wall_min, sp.wall_max))
     ov = c["G28"].value
     rule("ovality: between 25% and 75% of chart max (away from 0 and the max)",
          0.25 * sp.ovality_max - 1e-9 <= ov <= 0.75 * sp.ovality_max + 1e-9, (tag, ov, sp.ovality_max))
@@ -161,11 +164,22 @@ rng, tight = random.Random(1), []
 for od, size in chart()["sizes"].items():
     for sdr, w in size["wall"].items():
         for _ in range(20):
-            a, b = pick_pair(rng, size["od_min"], size["od_max"], 2, 0.1, True)
-            x, y = pick_pair(rng, w["min"], w["max"], 2, 0.01, True)
-            if not (size["od_min"] < a < b < size["od_max"] and w["min"] < x < y < w["max"]):
+            od_gap, wall_gap = RV["outside_diameter"]["min_gap_fraction"], RV["wall_thickness"]["min_gap_fraction"]
+            a, b = pick_pair(rng, size["od_min"], size["od_max"], 2, 0.1, True, od_gap)
+            x, y = pick_pair(rng, w["min"], w["max"], 2, 0.01, True, wall_gap)
+            if not (size["od_min"] < a < b < size["od_max"] and w["min"] < x < y < w["max"]
+                    and b - a >= od_gap * (size["od_max"] - size["od_min"]) - 1e-9
+                    and y - x >= wall_gap * (w["max"] - w["min"]) - 1e-9):
                 tight.append((od, sdr, a, b, x, y))
-check("all chart sizes x SDRs: OD and wall land strictly inside, minimum < maximum", not tight, tight[:3])
+check("all chart sizes x SDRs: OD and wall strictly inside, with the minimum gap, never a fallback",
+      not tight, tight[:3])
+
+# no date in the register: certificate made, all three dates blank, note kept
+r = copy.copy(good[0])
+r.date, r.warnings = None, ["date is empty; the certificate's dates are left blank"]
+c = build_report(r, 1).cells
+check("no date: D8, D9, D10 printed blank, everything else filled",
+      (c["D8"].text, c["D9"].text, c["D10"].text) == ("", "", "") and c["J9"].text and c["J24"].text)
 
 # warnings from the row travel with the report
 nb = next(x for x in good if not x.batch)

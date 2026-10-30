@@ -71,20 +71,25 @@ def pick(rng: random.Random, lo: float, hi: float, decimals: int, step: float | 
     return round(rng.randint(first, last) * step, decimals)
 
 
-def pick_pair(rng, lo, hi, decimals, step, strictly_inside=False) -> tuple[float, float]:
+def pick_pair(rng, lo, hi, decimals, step, strictly_inside=False, min_gap_fraction=0.0) -> tuple[float, float]:
     """Obtained minimum and maximum: both inside [lo, hi], minimum below maximum.
 
     strictly_inside: never exactly on lo or hi (falls back to touching only if the
     range is too narrow to hold two values inside it).
+    min_gap_fraction: the maximum is at least this share of (hi - lo) above the minimum,
+    so the two never look almost equal (3.24 / 3.25). If the range can't hold that gap,
+    the widest possible pair is used.
     """
     step = step or 10 ** -decimals
     first, last = math.ceil(round(lo / step, 9)), math.floor(round(hi / step, 9))
     if strictly_inside and (last - 1) - (first + 1) >= 1:
         first, last = first + 1, last - 1
-    if last - first >= 1:
-        a, b = sorted(rng.sample(range(first, last + 1), 2))
+    gap = max(1, math.ceil(round(min_gap_fraction * (hi - lo) / step, 9)))
+    if last - first >= gap:
+        a = rng.randint(first, last - gap)
+        b = rng.randint(a + gap, last)
     else:
-        a = b = first
+        a, b = first, last
     return round(a * step, decimals), round(b * step, decimals)
 
 
@@ -127,14 +132,14 @@ def build_report(row: Row, number: int | str, settings: dict | None = None,
 
     # header values from the production row
     rep, hc = s["report"], s["header_cells"]
-    made = row.date
-    start = made + timedelta(days=rep["testing_start_days_after_manufacturing"])
-    end = start + timedelta(days=rep["testing_end_days_after_start"])
+    made = row.date             # None: the register had no readable date, so all three print blank
+    start = made + timedelta(days=rep["testing_start_days_after_manufacturing"]) if made else None
+    end = start + timedelta(days=rep["testing_end_days_after_start"]) if made else None
     # the report no. may be typed by the user on the review screen ("BPP100/EX008"); digits stay a number
     number_text = str(number).strip()
     put(hc["report_no"], int(number_text) if number_text.isdigit() else number_text, number_text)
     for key, d in (("date_of_manufacturing", made), ("testing_start", start), ("testing_end", end)):
-        put(hc[key], d, fmt_date(d, rep["date_format"]))
+        put(hc[key], d, fmt_date(d, rep["date_format"]) if d else "")
     put(hc["batch"], row.batch)
     put(hc["grade"], row.grade)
     put(hc["pn"], plain_value(spec.pn), fmt_plain(spec.pn))
@@ -165,7 +170,8 @@ def build_report(row: Row, number: int | str, settings: dict | None = None,
     for name, lo, hi in (("outside_diameter", spec.od_min, spec.od_max),
                          ("wall_thickness", spec.wall_min, spec.wall_max)):
         c = rv[name]
-        a, b = pick_pair(rng, lo, hi, c["decimals"], c.get("step"), c.get("strictly_inside", False))
+        a, b = pick_pair(rng, lo, hi, c["decimals"], c.get("step"), c.get("strictly_inside", False),
+                         c.get("min_gap_fraction", 0.0))
         put_num(c["cells"]["minimum"], a, c["decimals"])
         put_num(c["cells"]["maximum"], b, c["decimals"])
 

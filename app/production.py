@@ -77,7 +77,7 @@ class Row:
     grade: str
     excel_row: int          # 1-based row number in the sheet, for messages
     sr_no: int
-    date: date
+    date: date | None               # None when the register has no readable date (dates printed blank)
     size_text: str
     report_no: str          # column "Report No.", used only for the file name
     batch: str
@@ -90,14 +90,14 @@ class Row:
 
     @property
     def key(self) -> tuple:
-        return (self.grade, financial_year(self.date), self.sr_no)
+        return (self.grade, financial_year(self.date) if self.date else None, self.sr_no)
 
     @property
     def ok(self) -> bool:
         return not self.problems
 
     def where(self) -> str:
-        return f"Production {self.grade[3:]} row {self.excel_row} (Sr. {self.sr_no}, {self.size_text!r})"
+        return f"Production {self.grade[3:]} row {self.excel_row} (Sr. {self.sr_no}, {self.size_text or 'no size'!r})"
 
 
 def financial_year(d: date) -> int:
@@ -251,14 +251,22 @@ def read_production(path: str | Path) -> ReadResult:
         for i, vals in enumerate(values[header + 1:], start=header + 2):
             sr = _num(get(vals, "sr_no"))
             size = _text(get(vals, "size"))
-            if sr is None or not size:
+            raw_date = get(vals, "date")
+            d = _to_date(raw_date)
+            if sr is None or (not size and d is None):
                 continue  # month title, TOTAL row, or pre-numbered empty row
-            d = _to_date(get(vals, "date"))
-            if d is None:
-                notes.append(f"{name} row {i}: Sr. {int(sr)} has a size but no readable date; skipped")
-                continue
+            # a started entry missing what the certificate needs is kept, with the reason,
+            # so it's listed under "No certificate" instead of disappearing
             row = Row(grade, i, int(sr), d, size, _text(get(vals, "report_no")), _text(get(vals, "batch")))
-            _resolve(row)
+            if d is None:
+                # like an empty batch: the certificate is still made, its three dates left blank
+                row.warnings.append("date is empty; the certificate's dates are left blank" if _text(raw_date) == "" else
+                                    f"date '{_text(raw_date)}' not readable (write it like 05-05-2025); "
+                                    "the certificate's dates are left blank")
+            if not size:
+                row.problems.append("size is empty")
+            else:
+                _resolve(row)
             rows.append(row)
     for name, grade in SHEETS.items():
         if name not in present:
