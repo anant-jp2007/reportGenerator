@@ -39,20 +39,10 @@ def validate(s: dict) -> list[str]:
         else:
             used_cells[cell] = what
 
-    company = s.get("company", {})
-    if company.get("selected") not in company.get("profiles", {}):
-        problems.append(f"company: selected profile '{company.get('selected')}' not found")
-    for cid, profile in company.get("profiles", {}).items():
-        for cell in ("A1", "A2", "A3", "A4", "A5"):
-            if not str(profile.get(cell, "")).strip():
-                problems.append(f"company '{cid}': {cell} is empty")
-    for cell in ("A1", "A2", "A3", "A4", "A5"):
-        use(cell, f"company {cell}")
-
     rep = s.get("report", {})
     if set(rep.get("grade_order", [])) != {"PE 63", "PE 80", "PE 100"}:
         problems.append("report.grade_order must list PE 63, PE 80 and PE 100")
-    for k in ("testing_start_days_after_manufacturing", "testing_end_days_after_start", "number_starts_at"):
+    for k in ("testing_start_days_after_manufacturing", "testing_end_days_after_start"):
         if not isinstance(rep.get(k), int) or rep[k] < 0:
             problems.append(f"report.{k} must be a whole number >= 0")
 
@@ -75,11 +65,12 @@ def validate(s: dict) -> list[str]:
             problems.append(f"{name}: decimals missing")
         if "min" in v or "max" in v:
             check_range(name, v.get("min"), v.get("max"))
-        for mx, (lo, hi) in v.get("range_by_chart_max", {}).items():
-            check_range(f"{name} (chart max {mx})", lo, hi)
-            if hi > float(mx):
-                problems.append(f"{name}: range for chart max {mx} goes above {mx}")
-        for key in ("other_max_fraction", "fraction_of_chart_max"):
+        for key in ("range_up_to_limit", "range_above_limit", "above_18dn"):
+            if key in v:
+                check_range(f"{name} {key}", *v[key])
+        if "width_above_half" in v and not 0 < v["width_above_half"]:
+            problems.append(f"{name}: width_above_half must be above 0")
+        for key in ("fraction_of_chart_max",):
             if key in v:
                 lo, hi = v[key]
                 check_range(f"{name} {key}", lo, hi)
@@ -93,14 +84,34 @@ def validate(s: dict) -> list[str]:
                     r["PE 100"][1] < r["PE 80"][0] and r["PE 80"][1] < r["PE 63"][0]):
                 problems.append(f"{name}: ranges overlap, so PE 100 < PE 80 < PE 63 is not guaranteed")
 
-    for cell in s.get("empty_cells", {}).get("cells", []):
-        use(cell, "empty value")
+    for cell in s.get("fixed_values", {}):
+        use(cell, "fixed value")
     for cell in s.get("fixed_text", {}):
         use(cell, "fixed text")
 
-    sig = s.get("signature", {})
-    if not (ROOT / sig.get("file", "")).is_file():
-        problems.append(f"signature file '{sig.get('file')}' not found")
+    # companies: own template and header; a header cell may replace a fixed text, never a value cell
+    company = s.get("company", {})
+    if company.get("selected") not in company.get("profiles", {}):
+        problems.append(f"company: selected profile '{company.get('selected')}' not found")
+    for cid, profile in company.get("profiles", {}).items():
+        what = f"company '{cid}'"
+        if not (ROOT / str(profile.get("template", ""))).is_file():
+            problems.append(f"{what}: template '{profile.get('template')}' not found")
+        cells = {k: v for k, v in profile.items() if CELL_RE.match(k)}
+        if not any(str(v).strip() for k, v in cells.items() if int(k[1:]) <= 5):
+            problems.append(f"{what}: no header text in rows 1-5")
+        for cell in cells:
+            if cell in used_cells and used_cells[cell] != "fixed text":
+                problems.append(f"{what}: cell {cell} is already used by {used_cells[cell]}")
+        for i, img in enumerate(profile.get("images", [])):
+            where = f"{what} image {i + 1}"
+            if not (ROOT / str(img.get("file", ""))).is_file():
+                problems.append(f"{where}: file '{img.get('file')}' not found")
+            if not CELL_RE.match(str(img.get("cell", ""))):
+                problems.append(f"{where}: '{img.get('cell')}' is not a cell inside A1:L40")
+            if not all(isinstance(img.get(k), (int, float)) and img[k] >= 0 for k in ("dx", "dy")) \
+                    or not (isinstance(img.get("height"), (int, float)) and img["height"] > 0):
+                problems.append(f"{where}: dx and dy must be 0 or more, height above 0 (points)")
     return problems
 
 
@@ -116,10 +127,14 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
     return s
 
 
+def company(s: dict, company_id: str | None = None) -> dict:
+    """A company's whole profile (name, template, images, header cells); the selected one by default."""
+    return s["company"]["profiles"][company_id or s["company"]["selected"]]
+
+
 def company_profile(s: dict, company_id: str | None = None) -> dict:
-    """The header cells (A1-A5) of a company; the selected one unless an id is given."""
-    profile = s["company"]["profiles"][company_id or s["company"]["selected"]]
-    return {k: v for k, v in profile.items() if CELL_RE.match(k)}
+    """The cells a company fills (its header, and any fixed text it replaces)."""
+    return {k: v for k, v in company(s, company_id).items() if CELL_RE.match(k)}
 
 
 def companies(s: dict) -> list[tuple[str, str]]:

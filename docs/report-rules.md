@@ -10,8 +10,8 @@ Items marked **(proposed)** are my suggestions awaiting the user's OK.
 
 | Cell | Value |
 |---|---|
-| Rows 1–5 | Company profile (name, ISO line, 2 address lines, certificate title). Same on every report. |
-| D7 Test Report No. | 1, 2, 3… in generation order (PE 63 rows, then PE 80, then PE 100, top to bottom). Editable before generating. |
+| Rows 1–5 | The chosen company's header (name, address lines, certificate title...), from its profile and template. |
+| D7 Test Report No. | Row's column D "REPORT NO." (e.g. MP63/171). Editable before generating. (Until 2026-10-30 it was 1, 2, 3… in generation order.) |
 | D8 Date of Manufacturing | Row's date (column B). |
 | D9 Date of Testing Start | Same as D8. |
 | D10 Date of Testing End | D8 + 3 calendar days (rolls over month/year correctly, e.g. 30-01 → 02-02). |
@@ -29,19 +29,19 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 |---|---|---|---|
 | 14–15 | 1 Colour | fixed | fixed: Black / Blue |
 | 16 | 2 Stripes – No. of strips | fixed | fixed: 3 Nos |
-| 17 | 2 Stripes – Width (min.) | fixed | random 3.00–7.00 mm |
-| 18 | 2 Stripes – Depth (max.) | fixed | random 0.10–0.16 mm |
+| 17 | 2 Stripes – Width (min.) | fixed | random 3.25–4.25 mm up to DN 110, 4.25–5.50 mm above |
+| 18 | 2 Stripes – Depth (max.) | fixed | random below 0.20 mm when the chart's wall minimum is up to 10 mm, below 0.45 mm above |
 | 19 | 3 Visual appearance | fixed | fixed: Satisfactory |
-| 20 | 3 Square of pipe end | "Maximum" + **Pipe End** from weight chart (by DN) | random in a reasonable range below the max; 2nd decimal always 0 or 5 (e.g. 1.55, 2.35, 6.70) |
-| 21–22 | 4 Length of pipes | fixed (typos fixed: "As Declared by Manufacturer") | value empty, unit "meters" stays |
-| 23 | 5 Coiling | fixed | value empty, unit "mm" stays |
+| 20 | 3 Square of pipe end | "Maximum" + **Pipe End** from weight chart (by DN) | random from half the max to half + 0.50 (2 → 1.00–1.50, 3 → 1.50–2.00); 2nd decimal always 0 or 5 |
+| 21–22 | 4 Length of pipes | fixed (typos fixed: "As Declared by Manufacturer") | always "---", unit "meters" stays |
+| 23 | 5 Coiling | fixed | up to DN 110: random 18 × DN + 50 to + 100 (DN 50 → 950–1000), whole mm; bigger sizes "---" |
 | 24 | 6 OD – Minimum | Mean OD **Min.** from weight chart (by DN) | random within spec min–max |
 | 25 | 6 OD – Maximum | Mean OD **Max.** from weight chart (by DN) | random within spec min–max, ≥ TVO minimum |
 | 26 | 7 Wall – Minimum | wall **Min.** from weight chart (by DN + SDR/PN column) | random within spec min–max |
 | 27 | 7 Wall – Maximum | wall **Max.** from weight chart (by DN + SDR/PN column) | random within spec min–max, ≥ TVO minimum |
-| 28 | 8 Ovality | "Maximum" + **Maximum Ovality** from weight chart (by DN) | random, a decent distance from both 0 and the max |
+| 28 | 8 Ovality | "Maximum" + **Maximum Ovality** from weight chart (by DN) | random 20–50 % of the max, ends in 0 or 5 |
 | 29 | 9 Pressure creep | fixed | fixed: Satisfactory |
-| 30 | 10 Longitudinal reversion | fixed (≤ 3.00 %) | random within condition |
+| 30 | 10 Longitudinal reversion | fixed (≤ 3.00 %) | random 1.00–2.00, ends in 0 or 5 |
 | 31 | 11 CBC | fixed (2.50 ± 0.50 %) | random within 2.00–3.00 |
 | 32 | 11 CBD | fixed | fixed: Satisfactory |
 | 33 | 12 Melt Flow Rate | fixed (0.15–1.10) | random by grade, always PE 100 < PE 80 < PE 63: around 0.25 / 0.45 / 0.80 |
@@ -49,12 +49,12 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 | 35 | 14 Density | fixed (940–960) | random, ideal value within condition |
 | 36 | 15 Elongation | fixed (≥ 350 %) | random, ideal value within condition |
 | 37 | 15 Yield strength | fixed (≥ 15 MPa) | random, ideal value within condition |
-| 39 | Tested by | signature image (`assets/signature.png`) | |
+| 39 | Tested by | left blank: signed by hand after printing (no signature image since 2026-10-30) | |
 
 ## Decisions (2026-10-30)
 
 - Square of pipe end ranges for max 3/4/5: approved as below.
-- The "2nd decimal is 0 or 5" rule applies **only** to square of pipe end. Other random values use normal decimals.
+- The "2nd decimal is 0 or 5" rule applies to square of pipe end, ovality and longitudinal reversion (changed 2026-10-30; first it was pipe end only).
 - Table header keeps the original spelling "Specification Requirments" (do not fix). Only rows 21–22 spelling is fixed.
 - Random values are drawn fresh **every time** a report is generated, even for the same row or the same size; reports must not repeat values.
 
@@ -111,8 +111,8 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
   matching the printed decimals; dates stored as dates and always shown dd-mm-yyyy with dashes.
 - One file per report, or one combined workbook with a sheet per report ("1. MP63-171", ...).
 - Page: A4, one page, centred horizontally (left/right margins 0.4"; the sample had 0.59"/0" and printed off-centre).
-- **User decision:** "Tested by :-" is on the **right** (G39:I39), the signature right after it. Print area
-  A1:L42 so the signature isn't cut off.
+- **User decision:** "Tested by :-" is on the **right** (G39:I39), with blank space after it to sign the printed
+  page (the signature image was removed 2026-10-30). Print area A1:L42 keeps that space on the page.
 - The PN line's underline running under "Kgs/Cm²" to the right border is as in the original Excel (user OK).
 
 ## Website (Step 7, 2026-10-30)
@@ -126,11 +126,14 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
   certificates, everything else stays the same. To add a company: copy the `balaji` profile, give it a new
   id, change `name` and A1–A5.
 - Check entries: new entries grouped PE 63 → PE 80 → PE 100, each with a tick box and an editable Report No.
-  (pre-filled 1, 2, 3…; any text is allowed, e.g. "BPP63/EX001"; digits are stored as a number).
+  (pre-filled from the register's column D, e.g. MP63/171; any text is allowed; digits are stored as a number).
   Notes under an entry when its report is still made (SDR taken from PN, empty batch); entries that can't
   get a certificate are listed below with the reason; unreadable sheets shown at the top.
-- Download: a ZIP, with a file per certificate or all in one workbook. Every download is also saved in
-  `output/<date time>/`. Uploaded registers are kept in `uploads/` for a day, then deleted.
+- Download: a ZIP sorted by grade (changed 2026-10-30). "A file for each certificate": folders `PE 63/`,
+  `PE 80/`, `PE 100/` with that grade's files (`PE 63/MP63-171.pdf`). "One file per grade" (was "All certificates in one file"): one file
+  per grade and format (`PE 63.pdf`, `PE 80.xlsx`...). Only grades with ticked entries appear. Every download is
+  also saved, with the same folders, in `output/<date time>/`. Uploaded registers are kept in `uploads/` for a
+  day, then deleted.
 - Both files are required. Uploading the same file twice shows "No new entries" with a hint about swapped files.
 - Only Excel for now; PDF and Word are added in Steps 8–9.
 
@@ -138,19 +141,82 @@ Columns A (Sr. No.), B (Clause No.), C (Name of the Test) are always the same.
 
 | Value | Range | Decimals |
 |---|---|---|
-| Stripe width | 3.00–7.00 | 2 |
-| Stripe depth | 0.10–0.16 | 2 |
-| Square of pipe end, max 2 | 0.75–1.50 | 2, ends in 0/5 |
-| Square of pipe end, max 3 | 1.00–2.25 | 2, ends in 0/5 |
-| Square of pipe end, max 4 | 1.25–3.00 | 2, ends in 0/5 |
-| Square of pipe end, max 5 | 1.50–3.75 | 2, ends in 0/5 |
-| Square of pipe end, max 7 | 2.00–6.00 | 2, ends in 0/5 |
+| Stripe width, DN up to 110 / above | 3.25–4.25 / 4.25–5.50 | 2 |
+| Stripe depth, chart wall min up to 10 mm / above | 0.10–0.19 / 0.25–0.44 | 2 |
+| Square of pipe end | half the max to half + 0.50 (2 → 1.00–1.50, 3 → 1.50–2.00, 5 → 2.50–3.00, 7 → 3.50–4.00) | 2, ends in 0/5 |
+| Coiling, DN up to 110 | 18 × DN + 50 to 18 × DN + 100 (bigger: "---") | 0 |
+| Length of pipes | "---" | |
 | OD min/max | within chart min–max | 1 (as in samples) |
 | Wall min/max | within chart min–max | 2 |
-| Ovality | 25–75 % of chart max | 2 |
-| Longitudinal reversion | 1.00–2.00 | 2 |
+| Ovality | 20–50 % of chart max | 2, ends in 0/5 |
+| Longitudinal reversion | 1.00–2.00 | 2, ends in 0/5 |
 | CBC | 2.30–2.60 | 2 |
 | MFR PE 100 / PE 80 / PE 63 | 0.230–0.270 / 0.420–0.480 / 0.750–0.850 | 3 |
-| Density | 947.00–951.00 | 2 |
+| Density | 948.00–952.00 | 2 |
 | Elongation | 600–750, multiple of 5 | 0 |
 | Yield strength | 18.00–23.00 | 2 |
+
+## Test value changes (2026-10-30, after Step 10)
+
+User's new rules for the test values obtained: stripe width by size (DN 110 limit), stripe depth by wall
+thickness (spec 0.20 up to 10 mm, 0.50 beyond), pipe end from half the max, ovality 20–50 %, longitudinal
+reversion and ovality ending in 0/5, density 948–952, length of pipes "---", coiling just above 18 × DN.
+- Stripe depth uses the chart's **wall minimum** (the nominal wall): sizes whose wall range crosses 10 mm
+  (e.g. 110 SDR 11, 10.00–11.10) count as "up to 10", so the depth always meets the 0.20 limit. Lower ends
+  of the depth ranges (0.10 and 0.25): my proposal, approved by the user.
+- Coiling above DN 110 prints "---" (my proposal, approved by the user).
+
+## Output changes (2026-10-30, after Step 10)
+
+- Certificate title (A5): CM/L number written with leading zeros, `CM/L - 0003712656`. Still fits on one line at
+  the same size (474 of 532 pt), so the row is unchanged. The template's A5 is now written from the default
+  company profile by `tools/make_template.py`.
+- No signature image: `signature.file` is empty in settings, the space after "Tested by :-" stays blank in
+  Excel, PDF and Word so the printed page can be signed. Putting an image path back in settings prints one again.
+- Report No. (D7) = the register's column D (MP code), not 1, 2, 3.
+- ZIP sorted by grade (see Website above). Combined Excel sheets are named after the file name (MP63-171).
+
+## Second company: Abhay Polyplast (2026-10-30)
+
+User: only the company header changes; the table, the rules and the register reading stay the same (Abhay's
+registers have the same sheets and columns). Abhay's own "Technical Data Sheet" was used for the header only;
+its row 7 (name of product) is ignored.
+- Header: logo top left; "ABHAY POLYPLAST" (24 pt bold), "( Manufacturers of HDPE Pipes )" / "(An ISO 9001:2015
+  Company)", two address lines, a "Works ✆ +91…" line with Wingdings phone sign (kept as the user asked; drawn
+  in all three formats), then the title.
+- **User decision:** title "( TEST CERTIFICATE OF HDPE PIPES AS PER IS 4984 : 2016 )", no CM/L number.
+- **User decision:** no "Tested by :-" for Abhay; their round stamp/signature at the bottom right under the table.
+- Own template `templates/test_report_abhay.xlsx`, built by `tools/make_company_template.py abhay` from the base
+  template: rows 1–5 re-merged (text right of the logo in C:L, phone line and title full width), taller rows.
+  Rows 6–37 are identical to Balaji's (checked by tests/test_settings.py).
+- Page: the sheet must fit A4 at 100% or Excel shrinks it and the PDF/Word would no longer match. The taller
+  header (+24 pt) is paid for by shorter empty rows under the table (38: 6 pt, 39–42: 13.5 pt), which hold the
+  stamp. 823.9 of 826.4 pt used.
+- Checked against Excel's and Word's own print: one page each, logo and stamp within 0.6 pt in all three.
+- Company pictures (`images` in the profile) replace the old single signature setting; Balaji has none.
+
+## More companies: Avtar Polyplast, Navdeep Polyplast (Shreenathji) (2026-10-30)
+
+Same rule as for Abhay: only the header changes; the table, the test-value rules and the register
+reading stay the same. Report No. and file names come from each register's column D, whatever the code
+(AP63/…, A100/…, NP100/…, SP100/…).
+- Avtar: logo top left, "AVTAR POLYPLAST PVT.LTD", address in two rows, "Works ✆ …" phone line, title with
+  CM/L 7600108409. "Tested by :-" kept, signed by hand (user decision). Template `templates/test_report_avtar.xlsx`.
+- Navdeep: header as on their certificate ("SHREENATHJI POLYPLAST", address, "Mfg. All Type Of HDPE Pipe &
+  Sprinkler Pipe.", phones and e-mail, title with CM/L 7600224411). No pictures. Their sheet's hidden rows
+  (Party Name, Purchase Order No.) are not used. "Tested by :-" kept. Template `templates/test_report_navdeep.xlsx`.
+- Both pay for the taller header with shorter empty rows under the table (38: 6 pt, 39: 15, 40–42: 13.5);
+  815.8 of 826.4 pt used. Checked against Excel's and Word's print: one page, logo within 0.8 pt.
+- Newton (added later the same day): logo top left, "NEWTON POLYPLAST", "( Manufacturers of HDPE Pipe & Fitings )"
+  (spelling as on their certificate), address in two lines, "Works ✆ …" line, title "( TEST REPORT OF HDPE PIPE AS PER
+  IS 4984 : 2016 CM/L - 7600013010)". "Tested by :-" kept. Template `templates/test_report_newton.xlsx`; 814.4 pt used.
+
+### Register reading for all companies
+- Grade sheets are found by name, ignoring case, spaces and punctuation: "Production 63", "PE 63", "PE-63",
+  "Prod 63"… Other sheets (Total, Monthwise…) are ignored. A grade with no sheet in either file is skipped
+  silently (e.g. Navdeep makes only PE 100); a sheet in only one of the two files is an error for that grade.
+- New entries are found by Sr. No. first: key = (grade, financial year, Sr. No.). A key may repeat (Navdeep
+  has two Sr. 78 rows; Avtar's PE 80 sheet repeats last year's block): each old row covers one new row with
+  that key, the identical one first, so only the extra rows are new.
+- **User decision:** when the PN and the SDR written in the size don't match the chart (e.g. PE 63
+  "50 X 6 ( SDR 17 )"), the PN is trusted and the SDR is taken from the chart, with a warning on the review screen.

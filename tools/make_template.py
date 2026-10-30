@@ -12,6 +12,9 @@ from pathlib import Path
 
 import openpyxl
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app.settings import company_profile, load_settings  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "data/source/test_report_sample.xlsx"
 OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "templates/test_report.xlsx"
@@ -23,7 +26,7 @@ VARIABLE_CELLS = [
     "J7", "J8", "J9", "J10",                 # grade, PN, DN, SDR
     "J17", "J18",                            # stripe width, depth
     "E20", "G20",                            # pipe end: spec max, value
-    "G21", "G23",                            # length, coiling: left empty
+    "G21", "G23",                            # length ("---"), coiling
     "E24", "E25", "J24", "J25",              # outside diameter
     "E26", "E27", "J26", "J27",              # wall thickness
     "E28", "G28",                            # ovality
@@ -41,6 +44,9 @@ def main():
 
     for ref in VARIABLE_CELLS:
         ws[ref].value = None
+    # rows 1-5: the default company's header from settings (each certificate writes its own company's)
+    for ref, text in company_profile(load_settings()).items():
+        ws[ref].value = text
     ws["D21"].value = "As Declared by Manufacturer"
     ws["G31"].number_format = "0.00"  # CBC was "General" in the sample; keep 2 decimals like 2.50
     # PN / DN / SDR were "0", which would print SDR 13.6 as 14 and PN 12.5 as 13
@@ -48,7 +54,7 @@ def main():
         ws[ref].number_format = "General"
     ws["D11"].number_format = "@"  # batch is text; the sample had a date format here
 
-    # "Tested by :-" moves from the left (B39:C39) to the right (G39:I39); the signature goes after it
+    # "Tested by :-" moves from the left (B39:C39) to the right (G39:I39); signed by hand after it
     label = ws["B39"]
     font, align = copy(label.font), copy(label.alignment)
     ws.unmerge_cells("B39:C39")
@@ -57,7 +63,7 @@ def main():
     ws["G39"].value = "Tested by :-"
     ws["G39"].font, ws["G39"].alignment = font, align
 
-    ws.print_area = "A1:L42"   # two spare rows below "Tested by :-" so the signature isn't cut off
+    ws.print_area = "A1:L42"   # two spare rows below "Tested by :-": room to sign the printed page
     # centred on the page: the sample had left margin 0.59" and right 0", so it sat off to the right
     ws.page_margins.left = ws.page_margins.right = 0.4
     ws.print_options.horizontalCentered = True

@@ -2,29 +2,109 @@
   "_readme": [
     "Settings for the test report generator. Edit values, keep the structure.",
     "Cell names (D7, J24, ...) are the cells of templates/test_report.xlsx; PDF and Word use the same layout.",
-    "In texts, \\n is a line break and ^{2} is a superscript 2 (Kgs/Cm^{2}).",
+    "In texts, \\n is a line break, ^{2} is a superscript 2 (Kgs/Cm^{2}) and ✆ is the phone sign (Wingdings).",
     "Random ranges: min and max are both possible; 'decimals' is how many decimals are printed;",
     "'step' (optional) is the smallest change, e.g. 0.05 gives values like 1.55 or 2.30, 5 gives 600, 605, 610."
   ],
 
   "company": {
-    "_help": "One profile per company. 'selected' is the default in the website's Company menu. To add a company, copy the balaji block, give it a new id and change name and A1-A5.",
+    "_help": [
+      "One profile per company. 'selected' is the default in the website's Company menu.",
+      "Each company has its own template (same table, its own header in rows 1-5). Header texts are given by cell;",
+      "a cell given here replaces the fixed text of that cell ('' leaves it empty, e.g. G39 'Tested by :-').",
+      "images: pictures placed on the page: cell = top-left cell, dx/dy = points right/down from it, height in points.",
+      "template_layout: how tools/make_company_template.py builds the template from templates/test_report.xlsx",
+      "(row heights, merged header cells, font size and bold). Run it after changing a company's header."
+    ],
     "selected": "balaji",
     "profiles": {
       "balaji": {
         "name": "Balaji Polyplast",
+        "template": "templates/test_report.xlsx",
+        "images": [],
         "A1": "BALAJI POLYPLAST",
         "A2": "(An ISO 9001:2000 Company )",
         "A3": "Survey No. 693, Plot No.1, Rajkot - Jamnagar Highway, Nr. Jivil Polytech",
         "A4": "Village :- Metoda, Tal. :- Paddhari,  Dist :- Rajkot - 360 110 ( Gujarat )",
-        "A5": "( TEST CERTIFICATE OF HDPE PIPES IS 4984 : 2016 CM/L - 3712656  )"
+        "A5": "( TEST CERTIFICATE OF HDPE PIPES IS 4984 : 2016 CM/L - 0003712656  )"
+      },
+      "abhay": {
+        "name": "Abhay Polyplast",
+        "template": "templates/test_report_abhay.xlsx",
+        "images": [
+          {"file": "assets/abhay_logo.png", "cell": "A1", "dx": 8, "dy": 5, "height": 70},
+          {"file": "assets/abhay_stamp.png", "cell": "J38", "dx": 22, "dy": 3, "height": 54}
+        ],
+        "C1": "ABHAY POLYPLAST",
+        "C2": "( Manufacturers of HDPE Pipes )\n(An ISO 9001:2015 Company)",
+        "C3": "Plot No. :- 7 / 8 Gokuldham Industrial Area,\nNear Kuvadava GIDC,Rajkot - Ahmedabad Highway, Rajkot ( Gujarat - India )",
+        "A4": "Works ✆ +91-96011 80488 E-mail :- info@abhaypolyplast.com  Web:- www.abhaypolyplast.com",
+        "A5": "( TEST CERTIFICATE OF HDPE PIPES AS PER IS 4984 : 2016 )",
+        "G39": "",
+        "template_layout": {
+          "merges": ["C1:L1", "C2:L2", "C3:L3", "A4:L4", "A5:L5"],
+          "fonts": {"C1": [24, true], "C2": [10, false], "C3": [10, false], "A4": [10, false], "A5": [12, true]},
+          "row_heights": {"1": 30, "2": 26.25, "3": 26.25, "4": 15, "5": 18.75,
+                          "38": 6, "39": 13.5, "40": 13.5, "41": 13.5, "42": 13.5}
+        }
+      },
+      "avtar": {
+        "name": "Avtar Polyplast Pvt. Ltd.",
+        "template": "templates/test_report_avtar.xlsx",
+        "images": [
+          {"file": "assets/avtar_logo.png", "cell": "A1", "dx": 4, "dy": 3, "height": 60}
+        ],
+        "C1": "AVTAR POLYPLAST PVT.LTD",
+        "C2": "Revenue Survey No. :- 20/256, Peiki - 27, Plot No. :- 1,\nSilver Industries Area,",
+        "C3": "At :- Makhavad, Taluka :- Lodhika, Dist. :- Rajkot ( Gujarat )",
+        "A4": "Works ✆ +91-98259 52166, 99250 72545, E-mail :- avtarpolyplastpvtltd@gmail.com.",
+        "A5": "( TEST CERTIFICATE OF HDPE PIPE IS 4984:2016 CM/L - 7600108409 )",
+        "template_layout": {
+          "merges": ["C1:L1", "C2:L2", "C3:L3", "A4:L4", "A5:L5"],
+          "fonts": {"C1": [20, true], "C2": [12, false], "C3": [12, false], "A4": [10, false], "A5": [12, true]},
+          "row_heights": {"1": 27, "2": 30, "3": 15.75, "4": 15, "5": 18.75,
+                          "38": 6, "39": 15, "40": 13.5, "41": 13.5, "42": 13.5}
+        }
+      },
+      "newton": {
+        "name": "Newton Polyplast",
+        "template": "templates/test_report_newton.xlsx",
+        "images": [
+          {"file": "assets/newton_logo.png", "cell": "A1", "dx": 13.5, "dy": 8, "height": 57}
+        ],
+        "C1": "NEWTON POLYPLAST",
+        "C2": "( Manufacturers of HDPE Pipe & Fitings )",
+        "C3": "Plot No. :- G - 2828, Lodhika G.I.D.C.,\nKalawad Road, Village :- METODA, Dist.:- Rajkot ( Gujarat - India )",
+        "A4": "Works ✆ +91-94272 40174 / +91 97240 77785  E-mail :- newtonpolyplast@gmail.com Web:- www.newtonpolyplast.com",
+        "A5": "( TEST REPORT OF HDPE PIPE AS PER IS 4984 : 2016 CM/L - 7600013010)",
+        "template_layout": {
+          "merges": ["C1:L1", "C2:L2", "C3:L3", "A4:L4", "A5:L5"],
+          "fonts": {"C1": [24, true], "C2": [10, false], "C3": [10, false], "A4": [10, false], "A5": [12, true]},
+          "row_heights": {"1": 30, "2": 15, "3": 26.25, "4": 15, "5": 18.75,
+                          "38": 6, "39": 15, "40": 13.5, "41": 13.5, "42": 13.5}
+        }
+      },
+      "navdeep": {
+        "name": "Navdeep Polyplast (Shreenathji)",
+        "template": "templates/test_report_navdeep.xlsx",
+        "images": [],
+        "A1": "SHREENATHJI POLYPLAST",
+        "A2": "PLOT NO.-97, KHIRASARA GIDC, ROAD H,\nKALAWAD ROAD, LODHIKA,RAJKOT-360021",
+        "A3": "Mfg. All Type Of HDPE Pipe & Sprinkler Pipe.",
+        "A4": "90999 48963 / 97144 90200 navdeeppolyplast2019@gmail.com",
+        "A5": "( TEST CERTIFICATE OF HDPE PIPE IS 4984 : 2016 CM/L - 7600224411 )",
+        "template_layout": {
+          "merges": ["A1:L1", "A2:L2", "A3:L3", "A4:L4", "A5:L5"],
+          "fonts": {"A1": [24, true], "A2": [10, false], "A3": [12, false], "A4": [12, false], "A5": [12, true]},
+          "row_heights": {"1": 30, "2": 26.25, "3": 15.75, "4": 15.75, "5": 18.75,
+                          "38": 6, "39": 15, "40": 13.5, "41": 13.5, "42": 13.5}
+        }
       }
     }
   },
 
   "report": {
-    "_help": "Report No. counts 1, 2, 3... in generation order (PE 63, then PE 80, then PE 100, top to bottom). Editable before generating.",
-    "number_starts_at": 1,
+    "_help": "Report No. (D7) is the production row's column D (REPORT NO.), e.g. MP63/171. Editable before generating. Certificates are made in grade order (PE 63, then PE 80, then PE 100, top to bottom).",
     "grade_order": ["PE 63", "PE 80", "PE 100"],
     "date_format": "dd-mm-yyyy",
     "testing_start_days_after_manufacturing": 0,
@@ -58,13 +138,19 @@
 
   "random_values": {
     "_help": "Test values obtained. New random values every time a report is generated.",
-    "stripe_width":  {"cell": "J17", "min": 3.00, "max": 7.00, "decimals": 2},
-    "stripe_depth":  {"cell": "J18", "min": 0.10, "max": 0.16, "decimals": 2},
+    "stripe_width": {
+      "cell": "J17", "decimals": 2, "dn_limit": 110,
+      "range_up_to_limit": [3.25, 4.25], "range_above_limit": [4.25, 5.50],
+      "_help": "Size (DN) up to dn_limit uses the first range, bigger sizes the second."
+    },
+    "stripe_depth": {
+      "cell": "J18", "decimals": 2, "wall_limit": 10,
+      "range_up_to_limit": [0.10, 0.19], "range_above_limit": [0.25, 0.44],
+      "_help": "Chart wall minimum (E26) up to wall_limit mm: below 0.20 (spec 0.20); above it: below 0.45 (spec 0.50)."
+    },
     "pipe_end": {
-      "cell": "G20", "decimals": 2, "step": 0.05,
-      "_help": "Range depends on the chart's Pipe End maximum (E20). Only this value ends in 0 or 5.",
-      "range_by_chart_max": {"2": [0.75, 1.50], "3": [1.00, 2.25], "4": [1.25, 3.00], "5": [1.50, 3.75], "7": [2.00, 6.00]},
-      "other_max_fraction": [0.375, 0.75]
+      "cell": "G20", "decimals": 2, "step": 0.05, "width_above_half": 0.50,
+      "_help": "From half the chart's Pipe End maximum (E20) to half + width_above_half: max 2 -> 1.00-1.50, 3 -> 1.50-2.00, 5 -> 2.50-3.00, 7 -> 3.50-4.00. Ends in 0 or 5."
     },
     "outside_diameter": {
       "cells": {"minimum": "J24", "maximum": "J25"}, "decimals": 2, "step": 0.1, "strictly_inside": true, "min_gap_fraction": 0.2,
@@ -75,30 +161,29 @@
       "_help": "Both inside the chart wall min-max (E26-E27), never exactly on a limit; obtained maximum is at least min_gap_fraction of the chart range above the minimum."
     },
     "ovality": {
-      "cell": "G28", "decimals": 2, "step": 0.01,
-      "fraction_of_chart_max": [0.25, 0.75],
-      "_help": "Kept a decent distance from 0 and from the chart maximum (E28)."
+      "cell": "G28", "decimals": 2, "step": 0.05,
+      "fraction_of_chart_max": [0.20, 0.50],
+      "_help": "20% to 50% of the chart maximum (E28), ends in 0 or 5."
     },
-    "longitudinal_reversion": {"cell": "G30", "min": 1.00, "max": 2.00, "decimals": 2},
+    "longitudinal_reversion": {"cell": "G30", "min": 1.00, "max": 2.00, "decimals": 2, "step": 0.05},
     "carbon_black_content":   {"cell": "G31", "min": 2.30, "max": 2.60, "decimals": 2},
     "melt_flow_rate": {
       "cell": "G33", "decimals": 3,
       "_help": "Ranges must not overlap so PE 100 < PE 80 < PE 63 always holds.",
       "by_grade": {"PE 100": [0.230, 0.270], "PE 80": [0.420, 0.480], "PE 63": [0.750, 0.850]}
     },
-    "density":                {"cell": "G35", "min": 947.00, "max": 951.00, "decimals": 2},
+    "density":                {"cell": "G35", "min": 948.00, "max": 952.00, "decimals": 2},
     "elongation_at_break":    {"cell": "G36", "min": 600, "max": 750, "decimals": 0, "step": 5},
-    "yield_strength":         {"cell": "G37", "min": 18.00, "max": 23.00, "decimals": 2}
+    "yield_strength":         {"cell": "G37", "min": 18.00, "max": 23.00, "decimals": 2},
+    "coiling": {
+      "cell": "G23", "decimals": 0, "dn_limit": 110, "above_18dn": [50, 100], "text_above_limit": "---",
+      "_help": "Size (DN) up to dn_limit: 18 x DN + 50 to 18 x DN + 100 (DN 50 -> 950-1000). Bigger sizes print text_above_limit."
+    }
   },
 
-  "empty_cells": {
-    "_help": "Test values left empty for now (units stay).",
-    "cells": ["G21", "G23"]
-  },
-
-  "signature": {
-    "file": "assets/signature.png",
-    "next_to": "G39"
+  "fixed_values": {
+    "_help": "Test values that are always the same text (the template keeps these cells empty).",
+    "G21": "---"
   },
 
   "fixed_text": {

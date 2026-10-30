@@ -1,6 +1,6 @@
 """Turn production rows into the full contents of test certificates.
 
-    reports = build_reports(diff.new)         # numbered 1, 2, 3... in grade order
+    reports = build_reports(diff.new)         # in grade order; Report No. = column D (MP63/171)
     r = reports[0]
     r.cells["J24"].text    -> "315.50"   (what is printed)
     r.cells["J24"].value   -> 315.5      (number, for Excel)
@@ -16,17 +16,32 @@ import random
 import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from pathlib import Path
 
 from app.production import Row
-from app.settings import company_profile, load_settings
+from app.settings import ROOT, company, company_profile, load_settings
 
 INVALID_FILE_CHARS = re.compile(r'[\\/:*?"<>|]')
+# signs written in another font: printed character -> (font, character in that font)
+SYMBOLS = {"✆": ("Wingdings", ")")}
+# "^{2}" (superscript) or a symbol, for the writers to split texts into runs
+MARKUP = re.compile(r"\^\{([^}]*)\}|(" + "|".join(SYMBOLS) + ")")
 
 
 @dataclass(frozen=True)
 class Cell:
     value: object       # str / int / float / date / None
-    text: str           # exactly what is printed; "^{2}" marks a superscript
+    text: str           # exactly what is printed; "^{2}" marks a superscript, "✆" the phone sign
+
+
+@dataclass(frozen=True)
+class Picture:
+    """A picture on the page (logo, stamp): top-left at `cell` + (dx, dy) points, `height` points tall."""
+    file: Path
+    cell: str
+    dx: float
+    dy: float
+    height: float
 
 
 @dataclass
@@ -35,8 +50,8 @@ class Report:
     row: Row
     file_name: str                       # without extension
     cells: dict[str, Cell]
-    signature_file: str
-    signature_next_to: str
+    template: Path                       # the company's template (same table, its own header)
+    pictures: list[Picture] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -94,18 +109,20 @@ def pick_pair(rng, lo, hi, decimals, step, strictly_inside=False, min_gap_fracti
 
 
 def pipe_end_range(conf: dict, chart_max: float) -> tuple[float, float]:
-    rng_by_max = conf["range_by_chart_max"]
-    key = f"{chart_max:g}"
-    if key in rng_by_max:
-        return tuple(rng_by_max[key])
-    lo, hi = conf["other_max_fraction"]
-    return chart_max * lo, chart_max * hi
+    """Half the chart maximum up to half + width_above_half (max 2 -> 1.00-1.50, 7 -> 3.50-4.00)."""
+    return chart_max / 2, chart_max / 2 + conf["width_above_half"]
+
+
+def by_limit(conf: dict, size: float, limit_key: str) -> tuple[float, float]:
+    """The range for sizes up to conf[limit_key], or the one for bigger sizes."""
+    return tuple(conf["range_up_to_limit" if size <= conf[limit_key] else "range_above_limit"])
 
 
 # ---------- building one report ----------
 
-def build_report(row: Row, number: int | str, settings: dict | None = None,
+def build_report(row: Row, number: int | str | None = None, settings: dict | None = None,
                  rng: random.Random | None = None) -> Report:
+    """number: Report No. printed in D7; by default the row's column D (REPORT NO., e.g. MP63/171)."""
     if not row.ok:
         raise ValueError(f"{row.where()}: {'; '.join(row.problems)}")
     s = settings or load_settings()
@@ -125,10 +142,11 @@ def build_report(row: Row, number: int | str, settings: dict | None = None,
             put(ref, int(x) if decimals == 0 else x, fmt_number(x, decimals))
 
     # company header and fixed texts
-    for ref, text in company_profile(s).items():
-        put(ref, text)
+    # fixed texts, then the company's header (which may replace a fixed text, e.g. G39 left empty)
     for ref, text in s["fixed_text"].items():
         put(ref, text, str(text))
+    for ref, text in company_profile(s).items():
+        put(ref, text or None, str(text))
 
     # header values from the production row
     rep, hc = s["report"], s["header_cells"]
@@ -136,7 +154,7 @@ def build_report(row: Row, number: int | str, settings: dict | None = None,
     start = made + timedelta(days=rep["testing_start_days_after_manufacturing"]) if made else None
     end = start + timedelta(days=rep["testing_end_days_after_start"]) if made else None
     # the report no. may be typed by the user on the review screen ("BPP100/EX008"); digits stay a number
-    number_text = str(number).strip()
+    number_text = str(row.report_no if number is None else number).strip()
     put(hc["report_no"], int(number_text) if number_text.isdigit() else number_text, number_text)
     for key, d in (("date_of_manufacturing", made), ("testing_start", start), ("testing_end", end)):
         put(hc[key], d, fmt_date(d, rep["date_format"]) if d else "")
@@ -154,10 +172,27 @@ def build_report(row: Row, number: int | str, settings: dict | None = None,
 
     # test values obtained
     rv = s["random_values"]
-    for name in ("stripe_width", "stripe_depth", "longitudinal_reversion", "carbon_black_content",
+    for name in ("longitudinal_reversion", "carbon_black_content",
                  "density", "elongation_at_break", "yield_strength"):
         c = rv[name]
         put_num(c["cell"], pick(rng, c["min"], c["max"], c["decimals"], c.get("step")), c["decimals"])
+
+    for ref, text in s["fixed_values"].items():
+        put(ref, text)
+
+    # stripes: width by size (DN), depth by the chart's wall minimum
+    for name, size, limit in (("stripe_width", spec.od, "dn_limit"), ("stripe_depth", spec.wall_min, "wall_limit")):
+        c = rv[name]
+        lo, hi = by_limit(c, size, limit)
+        put_num(c["cell"], pick(rng, lo, hi, c["decimals"], c.get("step")), c["decimals"])
+
+    # coiling: a little above 18 x DN for coilable sizes, a dash for bigger ones
+    c = rv["coiling"]
+    if spec.od <= c["dn_limit"]:
+        lo, hi = (18 * spec.od + extra for extra in c["above_18dn"])
+        put_num(c["cell"], pick(rng, lo, hi, c["decimals"], c.get("step")), c["decimals"])
+    else:
+        put(c["cell"], c["text_above_limit"])
 
     c = rv["pipe_end"]
     if spec.pipe_end is None:
@@ -188,20 +223,18 @@ def build_report(row: Row, number: int | str, settings: dict | None = None,
     lo, hi = c["by_grade"][row.grade]
     put_num(c["cell"], pick(rng, lo, hi, c["decimals"], c.get("step")), c["decimals"])
 
-    for ref in s["empty_cells"]["cells"]:
-        put(ref, None, "")
-
     if row.report_no:
         file_name = INVALID_FILE_CHARS.sub("-", row.report_no).strip()
     else:
         file_name = f"{row.grade.replace(' ', '')}-row{row.excel_row}"
-    sig = s["signature"]
-    return Report(number, row, file_name, cells, sig["file"], sig["next_to"], warnings)
+    co = company(s)
+    pictures = [Picture(ROOT / p["file"], p["cell"], p["dx"], p["dy"], p["height"]) for p in co.get("images", [])]
+    return Report(number_text, row, file_name, cells, ROOT / co["template"], pictures, warnings)
 
 
-def build_reports(rows: list[Row], first_number: int | None = None, settings: dict | None = None,
+def build_reports(rows: list[Row], settings: dict | None = None,
                   rng: random.Random | None = None) -> list[Report]:
-    """Number the rows 1, 2, 3... in grade order (PE 63, PE 80, PE 100, top to bottom).
+    """Reports in grade order (PE 63, PE 80, PE 100, top to bottom), Report No. from column D.
 
     Rows with problems are left out (the caller lists them for the user). File names are
     made unique by adding -2, -3... so no report overwrites another.
@@ -209,10 +242,9 @@ def build_reports(rows: list[Row], first_number: int | None = None, settings: di
     s = settings or load_settings()
     order = s["report"]["grade_order"]
     ok = sorted((r for r in rows if r.ok), key=lambda r: (order.index(r.grade), r.excel_row))
-    n = s["report"]["number_starts_at"] if first_number is None else first_number
     reports, used = [], {}
-    for i, row in enumerate(ok):
-        rep = build_report(row, n + i, s, rng)
+    for row in ok:
+        rep = build_report(row, None, s, rng)
         base = rep.file_name
         used[base.lower()] = used.get(base.lower(), 0) + 1
         if used[base.lower()] > 1:

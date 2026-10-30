@@ -1,6 +1,7 @@
 """Read the production register and find rows that are new since an older copy.
 
-Each grade has its own sheet ("Production 63", "Production 80", "Production 100").
+Each grade has its own sheet, named like "Production 63" or "PE 63" (every company's register
+is a little different). A company that doesn't make a grade simply has no sheet for it.
 Columns are found by their HEADING, not their position, so extra columns (Brand Name,
 Meters, Remark, ...) or a moved column don't matter. Only five columns are used:
 Sr. No., Date, Size, Report No., Batch Number.
@@ -12,14 +13,18 @@ pre-type report numbers on empty rows, and those are ignored.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
-from app.chart import ChartError, Spec, lookup
+from app.chart import ChartError, Spec, key, lookup, sdr_for
 
 SHEETS = {"Production 63": "PE 63", "Production 80": "PE 80", "Production 100": "PE 100"}
 GRADE_ORDER = ["PE 63", "PE 80", "PE 100"]
+# sheet names accepted for a grade, compared without case, spaces and punctuation
+SHEET_NAMES = {grade: {f"{p}{grade[3:]}" for p in ("production", "pe", "productionpe", "prod", "prodpe")}
+               for grade in GRADE_ORDER}
 HEADER_SEARCH_ROWS = 30
 
 SIZE_RE = re.compile(
@@ -143,14 +148,25 @@ def _to_date(v) -> date | None:
     return None
 
 
+def grade_of_sheet(name: str) -> str | None:
+    """'Production 63', 'PE 63', 'Production - 63' -> 'PE 63'; other sheets (Total...) -> None."""
+    cleaned = clean_heading(name)
+    return next((g for g, names in SHEET_NAMES.items() if cleaned in names), None)
+
+
+def _grade_sheets(names: list[str]) -> list[tuple[str, str]]:
+    """(sheet name, grade) of the grade sheets, in grade order; a second sheet for the same grade
+    makes that grade unreadable (raised as SheetError later), so it's kept twice here."""
+    found = [(n, grade_of_sheet(n)) for n in names]
+    return sorted(((n, g) for n, g in found if g), key=lambda x: GRADE_ORDER.index(x[1]))
+
+
 def _sheets(path: Path):
-    """Yield (sheet_name, rows) for each grade sheet present; rows are lists of cell values."""
+    """Yield (sheet_name, grade, rows) for each grade sheet present; rows are lists of cell values."""
     if path.suffix.lower() == ".xls":
         import xlrd
         wb = xlrd.open_workbook(str(path))
-        for name in SHEETS:
-            if name not in wb.sheet_names():
-                continue
+        for name, grade in _grade_sheets(wb.sheet_names()):
             sh = wb.sheet_by_name(name)
             rows = []
             for r in range(sh.nrows):
@@ -164,13 +180,12 @@ def _sheets(path: Path):
                         v = None
                     vals.append(v)
                 rows.append(vals)
-            yield name, rows
+            yield name, grade, rows
     else:
         import openpyxl
         wb = openpyxl.load_workbook(str(path), data_only=True, read_only=True)
-        for name in SHEETS:
-            if name in wb.sheetnames:
-                yield name, [list(r) for r in wb[name].iter_rows(values_only=True)]
+        for name, grade in _grade_sheets(wb.sheetnames):
+            yield name, grade, [list(r) for r in wb[name].iter_rows(values_only=True)]
 
 
 def find_columns(name: str, rows: list[list]) -> tuple[int, dict[str, int]]:
@@ -209,12 +224,19 @@ def _resolve(row: Row) -> None:
     if row.od is None:
         row.problems.append(f"size '{row.size_text}' not understood (expected like '63 X 10 ( SDR 13.6 )')")
         return
+    # PN and SDR written but not matching the chart: the PN is trusted (user's decision), the SDR
+    # comes from the chart for that grade and PN
+    pn_sdr = sdr_for(row.grade, row.pn)
+    clash = row.sdr is not None and pn_sdr is not None and pn_sdr != row.sdr
     try:
-        row.spec = lookup(row.grade, row.od, row.pn, row.sdr)
+        row.spec = lookup(row.grade, row.od, row.pn, None if clash else row.sdr)
     except ChartError as e:
         row.problems.append(str(e))
         return
-    if row.sdr is None:
+    if clash:
+        row.warnings.append(f"PN {key(row.pn)} and SDR {key(row.sdr)} don't match for {row.grade}; "
+                            f"PN trusted, so SDR {key(row.spec.sdr)}")
+    elif row.sdr is None:
         row.warnings.append(f"SDR not written; taken as SDR {row.spec.sdr:g} from {row.grade} PN {row.pn:g}")
     if not row.batch:
         row.warnings.append("batch number is empty")
@@ -227,6 +249,7 @@ class ReadResult:
     rows: list[Row]
     errors: dict[str, str]          # grade -> why the sheet couldn't be read
     notes: list[str]                # rows skipped while reading (e.g. no date)
+    grades: set[str] = field(default_factory=set)   # grades that have a sheet in the file
 
 
 def read_production(path: str | Path) -> ReadResult:
@@ -234,10 +257,13 @@ def read_production(path: str | Path) -> ReadResult:
     rows: list[Row] = []
     errors: dict[str, str] = {}
     notes: list[str] = []
-    present = set()
-    for name, values in _sheets(path):
-        present.add(name)
-        grade = SHEETS[name]
+    present: dict[str, str] = {}
+    for name, grade, values in _sheets(path):
+        if grade in present:
+            errors[grade] = f"two sheets for {grade} ('{present[grade]}' and '{name}'); keep one"
+            rows = [r for r in rows if r.grade != grade]
+            continue
+        present[grade] = name
         try:
             header, col = find_columns(name, values)
         except SheetError as e:
@@ -268,10 +294,7 @@ def read_production(path: str | Path) -> ReadResult:
             else:
                 _resolve(row)
             rows.append(row)
-    for name, grade in SHEETS.items():
-        if name not in present:
-            errors[grade] = f"sheet '{name}' not found"
-    return ReadResult(rows, errors, notes)
+    return ReadResult(rows, errors, notes, set(present))
 
 
 @dataclass
@@ -284,14 +307,42 @@ class Diff:
 def find_new_rows(old_path, new_path) -> Diff:
     """Rows filled in the new file that weren't filled in the old one.
 
-    Rows that exist in both files are never reported again, even if edited (user's decision).
+    Rows are matched by Sr. No. first: key = (grade, financial year, Sr. No.). Rows that exist in
+    both files are never reported again, even if edited (user's decision). A key can appear more
+    than once (a register that repeats a Sr. No., or last year's block copied below): each old row
+    covers one new row with that key, the identical one first, and any extra rows are new.
     A grade whose sheet can't be read in either file is skipped entirely, with the reason;
     otherwise every row of it would look new.
     """
     old, new = read_production(old_path), read_production(new_path)
     errors = [f"old file: {e}" for e in old.errors.values()] + [f"new file: {e}" for e in new.errors.values()]
-    blocked = old.errors.keys() | new.errors.keys()
-    old_keys = {r.key for r in old.rows}
-    fresh = [r for r in new.rows if r.grade not in blocked and r.key not in old_keys]
+    # a grade the company doesn't make has no sheet in either file: nothing to say. A sheet in only
+    # one of the files can't be compared (wrong file, or a renamed sheet), so that grade is skipped.
+    if not old.grades and not new.grades:
+        errors.append("no PE 63 / PE 80 / PE 100 sheets found in either file (sheets named like "
+                      "'Production 63' or 'PE 63')")
+    for g in GRADE_ORDER:
+        if (g in old.grades) != (g in new.grades):
+            which = "old" if g in new.grades else "new"
+            errors.append(f"{which} file: no sheet for {g}, so {g} can't be compared")
+    blocked = old.errors.keys() | new.errors.keys() | (old.grades ^ new.grades)
+    def same(r: Row) -> tuple:
+        return r.key, r.date, r.size_text, r.batch
+
+    left_same, left_key = Counter(same(r) for r in old.rows), Counter(r.key for r in old.rows)
+    candidates = [r for r in new.rows if r.grade not in blocked]
+    unmatched = []
+    for r in candidates:                    # identical rows first: an edited duplicate is the new one
+        if left_same[same(r)]:
+            left_same[same(r)] -= 1
+            left_key[r.key] -= 1
+        else:
+            unmatched.append(r)
+    fresh = []
+    for r in unmatched:                     # then same Sr. No. (edited rows stay old)
+        if left_key[r.key] > 0:
+            left_key[r.key] -= 1
+        else:
+            fresh.append(r)
     fresh.sort(key=lambda r: (GRADE_ORDER.index(r.grade), r.excel_row))
     return Diff(fresh, errors, [f"new file: {n}" for n in new.notes])

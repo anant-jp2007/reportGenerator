@@ -50,8 +50,8 @@ for rep in reports:
             if not all(w in words for w in t.split()):
                 missing.append((rep.file_name, ref, t))
     fonts |= {f[3] for f in page.get_fonts()}
-    if not page.get_images():
-        missing.append((rep.file_name, "signature", "no image"))
+    if page.get_images():
+        missing.append((rep.file_name, "Balaji has no pictures (signed by hand)", "has an image"))
 
 check(f"{len(reports)} PDFs: every value of the certificate is printed", not missing, missing[:5])
 check("one page each", set(pages) == {1}, pages)

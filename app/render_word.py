@@ -1,4 +1,4 @@
-"""Write reports as Word documents laid out like Excel's print of templates/test_report.xlsx.
+"""Write reports as Word documents laid out like Excel's print of the company's template.
 
     write_word(report, "MP100-019.docx")             # one certificate
     write_word_combined(reports, "All.docx")         # one page per certificate
@@ -21,12 +21,12 @@ from docx.oxml.ns import qn
 from docx.shared import Pt
 from openpyxl.utils import get_column_letter
 
-from app.layout import TABLE_SHIFT_X, TEMPLATE, Layout, load_layout
+from app.layout import TABLE_SHIFT_X, Layout, load_layout
 from reportlab.pdfbase import pdfmetrics
 
-from app.render_pdf import (CELL_PAD, LINE_SPACING, SIGNATURE_HEIGHT, SIGNATURE_LIFT, SUPER_RISE, SUPER_SIZE,
-                            SUPERSCRIPT, font_for)
-from app.report import Report
+from app.render_pdf import (CELL_PAD, LINE_SPACING, SUPER_RISE, SUPER_SIZE, SUPERSCRIPT, font_for,
+                            picture_position)
+from app.report import MARKUP, SYMBOLS, Report
 
 ROOT = Path(__file__).resolve().parent.parent
 BORDER_EIGHTHS = 8          # Word border width in 1/8 pt: 8 = 1 pt (Excel's PDF draws 0.96 pt)
@@ -119,13 +119,18 @@ def _excel_spaces(line: str, continued: bool) -> tuple[str, int]:
 
 
 def _add_text_runs(para, line: str, style) -> None:
-    """Runs for one line; ^{x} becomes a superscript drawn like Excel's (67% size, raised 41%)."""
+    """Runs for one line; ^{x} becomes a superscript drawn like Excel's (67% size, raised 41%),
+    a symbol (✆) a run in its own font (Wingdings ')')."""
     pos = 0
-    for m in list(SUPERSCRIPT.finditer(line)) + [None]:
+    for m in list(MARKUP.finditer(line)) + [None]:
         end = m.start() if m else len(line)
         if end > pos:
             _font(para.add_run(line[pos:end]), style.font, style.size, style.bold, style.italic)
-        if m:
+        if m and m.group(2):
+            sym_font, char = SYMBOLS[m.group(2)]
+            _font(para.add_run(char), sym_font, style.size, False, False)
+            pos = m.end()
+        elif m:
             r = para.add_run(m.group(1))
             _font(r, style.font, round(style.size * SUPER_SIZE * 2) / 2, style.bold, style.italic)
             pos_el = OxmlElement("w:position")
@@ -190,19 +195,19 @@ def _write_text(cell, text: str, style, is_number: bool, box_width: float) -> No
 
 
 
-def _float_signature(run, x_pt: float, y_pt: float) -> None:
-    """Turn the inline picture in `run` into one floating over the page at (x, y) from the table cell."""
+def _float_picture(run, x_pt: float, y_pt: float) -> None:
+    """Turn the inline picture in `run` into one floating over the page at (x, y) from the page's corner."""
     inline = run._r.find(".//" + qn("wp:inline"))
     anchor = OxmlElement("wp:anchor")
     for k, v in (("distT", "0"), ("distB", "0"), ("distL", "0"), ("distR", "0"), ("simplePos", "0"),
-                 ("relativeHeight", "2"), ("behindDoc", "0"), ("locked", "0"), ("layoutInCell", "1"),
+                 ("relativeHeight", "2"), ("behindDoc", "0"), ("locked", "0"), ("layoutInCell", "0"),
                  ("allowOverlap", "1")):
         anchor.set(k, v)
     sp = OxmlElement("wp:simplePos")
     sp.set("x", "0")
     sp.set("y", "0")
     anchor.append(sp)
-    for tag, rel, off in (("wp:positionH", "column", x_pt), ("wp:positionV", "paragraph", y_pt)):
+    for tag, rel, off in (("wp:positionH", "page", x_pt), ("wp:positionV", "page", y_pt)):
         pos = OxmlElement(tag)
         pos.set("relativeFrom", rel)
         o = OxmlElement("wp:posOffset")
@@ -222,16 +227,31 @@ def _float_signature(run, x_pt: float, y_pt: float) -> None:
     inline.getparent().replace(inline, anchor)
 
 
+def _table_left(lay: Layout) -> float:
+    """Page x of the table's left edge (as in the PDF: centred between the margins, Excel's shift)."""
+    left_m, right_m, _, _ = lay.page_margins
+    return left_m + ((595.3 - left_m - right_m - lay.width) / 2 + TABLE_SHIFT_X if lay.centered else 0)
+
+
+def _add_pictures(para, report: Report, lay: Layout) -> None:
+    """Logo / stamp floating at the same page position as in the PDF, anchored in the paragraph
+    after the certificate's table (a picture inside a table cell would be kept inside that cell)."""
+    for pic in report.pictures:
+        x, y = picture_position(lay, pic)
+        run = para.add_run()
+        run.add_picture(str(pic.file), height=Pt(pic.height))
+        _float_picture(run, _table_left(lay) + x, lay.page_margins[2] + y)
+
+
 def _add_certificate(doc, report: Report, lay: Layout) -> None:
     import openpyxl
-    ws = openpyxl.load_workbook(TEMPLATE).active
+    ws = openpyxl.load_workbook(report.template).active
     nrows, ncols = len(lay.rows), len(lay.cols)
     table = doc.add_table(rows=nrows, cols=ncols)
     table.alignment = WD_TABLE_ALIGNMENT.LEFT
     _fixed_layout(table, lay.cols)
-    left_m, right_m, _, _ = lay.page_margins
     # Word measures a table indent to the text of the first cell, so the cell padding is added back
-    indent = ((595.3 - left_m - right_m - lay.width) / 2 + TABLE_SHIFT_X if lay.centered else 0) + CELL_PAD
+    indent = _table_left(lay) - lay.page_margins[0] + CELL_PAD
     ind = OxmlElement("w:tblInd")
     ind.set(qn("w:w"), str(round(indent * 20)))
     ind.set(qn("w:type"), "dxa")
@@ -295,18 +315,9 @@ def _add_certificate(doc, report: Report, lay: Layout) -> None:
                 _write_text(cell, rc.text, st, isinstance(rc.value, (int, float)) and not isinstance(rc.value, bool),
                             lay.boxes[ref].w)
 
-    sig = ROOT / report.signature_file
-    if sig.is_file():
-        from app.layout import merged_area_of
-        min_col, min_row, max_col, _ = merged_area_of(report.signature_next_to)
-        target = table.cell(min_row - 1, max_col)          # first cell after "Tested by :-"
-        run = target.paragraphs[0].add_run()
-        run.add_picture(str(sig), height=Pt(SIGNATURE_HEIGHT))
-        _float_signature(run, 0, -SIGNATURE_LIFT)
 
-
-def _new_document():
-    lay = load_layout()
+def _new_document(template: Path):
+    lay = load_layout(template)
     doc = Document()
     sec = doc.sections[0]
     sec.page_width, sec.page_height = Pt(595.3), Pt(841.9)
@@ -328,10 +339,10 @@ def _finish(doc):
 
 
 def write_word(report: Report, path: str | Path) -> Path:
-    doc, lay = _new_document()
+    doc, lay = _new_document(report.template)
     doc.paragraphs[0]._p.getparent().remove(doc.paragraphs[0]._p) if doc.paragraphs else None
     _add_certificate(doc, report, lay)
-    doc.add_paragraph()
+    _add_pictures(doc.add_paragraph(), report, lay)
     _finish(doc)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -340,10 +351,11 @@ def write_word(report: Report, path: str | Path) -> Path:
 
 
 def write_word_combined(reports: list[Report], path: str | Path) -> Path:
-    doc, lay = _new_document()
+    doc, lay = _new_document(reports[0].template)      # one company per run
     for i, report in enumerate(reports):
         _add_certificate(doc, report, lay)
         p = doc.add_paragraph()
+        _add_pictures(p, report, lay)
         if i < len(reports) - 1:
             p.add_run().add_break(WD_BREAK.PAGE)
     _finish(doc)

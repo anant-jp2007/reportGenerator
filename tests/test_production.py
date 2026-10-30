@@ -264,6 +264,59 @@ d = find_new_rows(save(book, "old_broken80.xlsx"), REAL)
 check("a sheet unreadable in the old file is skipped, not reported as all-new",
       all(r.grade != "PE 80" for r in d.new) and any("Production 80" in e for e in d.errors), d.errors)
 
+# other companies' registers: sheets named "PE 63" etc., extra sheets, grades they don't make
+def renamed(book, names):
+    return {names.get(n, n): rows for n, rows in book.items()}
+
+
+PE_NAMES = {"Production 63": "PE 63", "Production 80": "PE-80", "Production 100": "PE 100"}
+old = save(renamed(blank(copy_book(ORIGINAL), "Production 100", [52, 53]), PE_NAMES) | {"Total": [["x"]]}, "old_pe.xlsx")
+new = save(renamed(copy_book(ORIGINAL), PE_NAMES) | {"Total - Monthwise": [["x"]]}, "new_pe.xlsx")
+d = find_new_rows(old, new)
+got = [(r.grade, r.sr_no) for r in d.new]
+check("sheets named 'PE 63' / 'PE-80' read as grades, other sheets ignored",
+      got == [("PE 100", 18), ("PE 100", 19)] and not d.errors, (got, d.errors))
+
+only100 = {"Production 100": ORIGINAL["Production 100"]}
+d = find_new_rows(save(blank(copy_book(only100), "Production 100", [52, 53]), "old_100.xlsx"), save(copy_book(only100), "new_100.xlsx"))
+got = [(r.grade, r.sr_no) for r in d.new]
+check("company making only PE 100: other grades skipped silently", got == [("PE 100", 18), ("PE 100", 19)] and not d.errors,
+      (got, d.errors))
+
+d = find_new_rows(save(copy_book(only100), "old_only100.xlsx"), REAL)
+check("a grade with a sheet in only one file is not compared (never all-new), with the reason",
+      all(r.grade == "PE 100" for r in d.new) and any("old file: no sheet for PE 63" in e for e in d.errors), d.errors)
+
+d = find_new_rows(save({"Sheet1": [["x"]]}, "old_none.xlsx"), save({"Sheet1": [["x"]]}, "new_none.xlsx"))
+check("no grade sheets at all: error", d.new == [] and any("no PE 63" in e for e in d.errors), d.errors)
+
+# Sr. No. is the first key. A register can repeat a Sr. No. (two rows typed with the same number,
+# or last year's block copied below): each old row covers one new row, so the extra row is new.
+book = copy_book(ORIGINAL)
+pe100 = book["Production 100"]
+row17 = next(i for i, r in enumerate(pe100) if r and r[0] == 17)
+copy17 = list(pe100[row17]); copy17[4] = "BATCH-EXTRA"
+old = save(copy_book(book) | {"Production 100": pe100[:row17 + 1] + [list(pe100[row17])]}, "old_dup.xlsx")
+new = save(copy_book(book) | {"Production 100": pe100[:row17 + 1] + [list(pe100[row17]), copy17]}, "new_dup.xlsx")
+d = find_new_rows(old, new)
+got = [(r.grade, r.sr_no, r.batch) for r in d.new]
+check("a repeated Sr. No. already in the old file twice is not new; a third, different row with it is",
+      got == [("PE 100", 17, "BATCH-EXTRA")], got)
+new = save(copy_book(book) | {"Production 100": pe100[:row17 + 1] + [copy17, list(pe100[row17])]}, "new_dup2.xlsx")
+d = find_new_rows(old, new)
+got = [(r.grade, r.sr_no, r.batch) for r in d.new]
+check("the different row is the new one wherever it stands", got == [("PE 100", 17, "BATCH-EXTRA")], got)
+
+# PN and SDR that don't match the chart: the PN is trusted (user's decision)
+book = copy_book(ORIGINAL)
+book["Production 63"][-1] = list(book["Production 63"][-1])
+last = next(i for i in range(len(book["Production 63"]) - 1, 0, -1) if book["Production 63"][i] and book["Production 63"][i][2])
+book["Production 63"][last][2] = "50 X 6 ( SDR 17 )"
+row = next(r for r in read_production(save(book, "pn_clash.xlsx")).rows if r.grade == "PE 63" and r.excel_row == last + 1)
+check("'50 X 6 ( SDR 17 )' on PE 63: certified as PN 6 / SDR 13.6, with a warning",
+      row.ok and row.spec.sdr == 13.6 and row.spec.pn == 6 and any("PN trusted" in w for w in row.warnings),
+      (row.problems, row.warnings))
+
 print(f"\n(test copies in {TMP})")
 print("ALL PASS" if not failures else f"{failures} FAILED")
 sys.exit(1 if failures else 0)

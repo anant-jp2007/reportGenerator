@@ -17,7 +17,7 @@ Production register (.xls/.xlsx)        Certificate template (.xlsx)       IS 49
 
 ## Features
 
-- **New-entry detection.** Compares two copies of the register sheet by sheet (`Production 63 / 80 / 100`).
+- **New-entry detection.** Compares two copies of the register sheet by sheet (`Production 63`, `PE 63`, ...), matching rows by Sr. No.
   A row is identified by grade + financial year + Sr. No. (Sr. No. restarts every April). Rows edited after
   their certificate was made, and rows that only have a pre-typed report number, are ignored.
 - **Columns found by heading, not position.** Extra or moved columns don't matter. Headings are matched
@@ -34,10 +34,13 @@ Production register (.xls/.xlsx)        Certificate template (.xlsx)       IS 49
   drawn directly from the template's layout (no Excel needed). The Word file is an editable table on the same
   grid. Both PDF and Word were measured against Excel's own print: across all 174 text pieces the median
   position difference is about 0.25 pt, and every point of every border line is printed.
-- **Several companies.** The header (company name, address, licence number) is a profile in the settings. The
-  first screen has a company menu.
-- **Review before generating.** Untick entries, type a report number per certificate, then choose the formats
-  and whether to have one file per certificate or one combined file. Every download is also saved under `output/`.
+- **Several companies.** Each company has a profile in the settings: its header (name, address, licence number),
+  its own template (same table, its own header layout) and optional pictures such as a logo or stamp. The first
+  screen has a company menu.
+- **Review before generating.** Untick entries, change the report number (taken from the register's Report No.
+  column) if needed, then choose the formats and whether to have one file per certificate or one file per grade.
+  The ZIP is sorted by grade: a `PE 63` / `PE 80` / `PE 100` folder per grade, or `PE 63.pdf`, `PE 80.pdf`... when
+  combined. Every download is also saved under `output/`.
 
 ## Requirements
 
@@ -55,7 +58,7 @@ cd reportGenerator
 python -m pip install -r requirements.txt
 ```
 
-Add a signature image at `assets/signature.png` (it's printed after "Tested by :-"), then start the app:
+Start the app:
 
 ```bash
 python -m app.web
@@ -73,7 +76,8 @@ python tools/make_sample_registers.py samples
 
 ## The production register
 
-One sheet per grade: `Production 63`, `Production 80`, `Production 100`. The sheet name gives the grade. Only five
+One sheet per grade, named like `Production 63` or `PE 63` (case, spaces and punctuation ignored); other sheets are
+ignored and a grade a company doesn't make simply has no sheet. The sheet name gives the grade. Only five
 columns are read, found by their heading anywhere in the first 30 rows:
 
 | Heading | Used for |
@@ -94,16 +98,19 @@ aimed at the same cell, a company with an empty header line…).
 
 | Section | What it holds |
 |---|---|
-| `company` | header profiles (cells A1–A5) and which one is the default |
+| `company` | company profiles (template, header cells, pictures, header layout) and which one is the default |
 | `report` | report numbering, grade order, date format, testing start/end offsets |
 | `header_cells`, `chart_cells` | which template cell gets which value |
 | `random_values` | ranges, decimals and steps for every test value |
 | `empty_cells` | test values deliberately left blank |
 | `fixed_text` | every fixed text on the certificate (`^{2}` marks a superscript) |
-| `signature` | the signature image and the cell it goes next to |
 
-**Adding a company:** copy the `balaji` profile, give it a new id, and change `name` and A1–A5. It appears in the
-company menu.
+**Adding a company:** copy a profile and give it a new id, a `name`, its header texts by cell and a `template`
+path. Header-only changes (same rows as the base) can reuse `templates/test_report.xlsx`; for a different header
+layout add `template_layout` (merged cells, fonts, row heights) and run
+`python tools/make_company_template.py <id>` to build its template. The table (rows 6 onwards) always stays the
+same. Pictures (`images`) are placed by cell plus an offset in points. Keep the page within A4 at 100%
+(`tests/test_settings.py` checks this), so the PDF and Word copies stay identical to Excel's print.
 
 ## The IS 4984 weight chart
 
@@ -166,8 +173,8 @@ their first argument (default `data/source/production_sample.xls`); `test_end_to
 
 ## Local files
 
-Files that belong to an installation stay on that computer and aren't part of the repository: the signature
-image (`assets/`), input files (`data/source/`, `samples/`), uploaded registers (`uploads/`, deleted after a day)
+Files that belong to an installation stay on that computer and aren't part of the repository: an optional
+company pictures (`assets/`), input files (`data/source/`, `samples/`), uploaded registers (`uploads/`, deleted after a day)
 and generated certificates (`output/`).
 
 ## Limitations

@@ -49,8 +49,8 @@ for rep in reports:
         p = plain(cell.text)
         if p and not all(w in text for w in p.split()):
             missing.append((rep.file_name, ref, p))
-    if not d.inline_shapes and "graphic" not in d.element.xml:
-        missing.append((rep.file_name, "signature", "no picture"))
+    if d.inline_shapes or "graphic" in d.element.xml:
+        missing.append((rep.file_name, "signature", "has a picture; must stay blank to sign by hand"))
 
 check(f"{len(reports)} Word files: every value of the certificate is in the table", not missing, missing[:5])
 check("table has the template's rows and columns", not shape, shape[:3])
@@ -61,7 +61,7 @@ check("A4 page", (round(sec.page_width.pt), round(sec.page_height.pt)) == (595, 
 check("fixed column widths from the template (6 pt per width unit)",
       [round(int(g.get(docx.oxml.ns.qn("w:w"))) / 20, 1) for g in d.tables[0]._tbl.tblGrid.findall(docx.oxml.ns.qn("w:gridCol"))]
       == [round(w, 1) for w in lay.cols])
-check("signature floats after 'Tested by :-'", "wp:anchor" in d.element.xml or "<wp:anchor" in d.tables[0]._tbl.xml)
+check("no signature picture after 'Tested by :-' (signed by hand)", "wp:anchor" not in d.element.xml)
 
 d = docx.Document(write_word_combined(reports, TMP / "All.docx"))
 check("combined: one table per certificate, page breaks between",

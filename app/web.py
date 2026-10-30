@@ -5,6 +5,10 @@
 Runs only on this computer (127.0.0.1), no internet needed. Uploaded registers are kept in
 uploads/<id>/ for a day so the review screen can be generated from; every download is also
 saved in output/<date time>/ as a history.
+
+The ZIP is sorted by grade: a file per certificate goes in a "PE 63" / "PE 80" / "PE 100"
+folder; "all in one file" makes one file per grade and format (PE 63.pdf, PE 80.pdf...).
+Only grades with ticked entries appear.
 """
 from __future__ import annotations
 
@@ -122,14 +126,10 @@ def _upload_error(message, company=None):
 
 def _review(token, names, company_name, diff):
     groups = []
-    number = load_settings()["report"]["number_starts_at"]
     for grade in GRADE_ORDER:
         rows = [r for r in diff.new if r.grade == grade]
-        good = []
-        for r in rows:
-            if r.ok:
-                good.append((r, number))
-                number += 1
+        # Report No. starts as the register's column D (MP63/171); editable on the screen
+        good = [(r, r.report_no) for r in rows if r.ok]
         groups.append({"grade": grade, "rows": good,
                        "skipped": [r for r in rows if not r.ok]})
     return render_template("review.html", step=2, company_name=company_name, token=token, names=names,
@@ -160,8 +160,9 @@ def download():
         row = by_id.get(rid)
         if row is None:
             abort(400, "An entry is no longer in the register. Choose the files again.")
-        number = request.form.get(f"no-{rid}", "").strip() or str(len(reports) + 1)
+        number = request.form.get(f"no-{rid}", row.report_no).strip()
         reports.append(build_report(row, number, settings))
+    reports.sort(key=lambda rep: GRADE_ORDER.index(rep.row.grade))   # stable: register order within a grade
     _unique_names(reports)
 
     stamp = datetime.now().strftime("%Y-%m-%d %H%M%S")
@@ -169,19 +170,24 @@ def download():
     writers = {"excel": (".xlsx", write_excel, write_excel_combined),
                "pdf": (".pdf", write_pdf, write_pdf_combined),
                "word": (".docx", write_word, write_word_combined)}
+    by_grade = {g: [rep for rep in reports if rep.row.grade == g] for g in GRADE_ORDER}
     made = []
     for fmt in formats:
         ext, one, many = writers[fmt]
-        if combined:
-            made.append(many(reports, out / f"Test certificates {stamp[:10]}{ext}"))
-        else:
-            for rep in reports:
-                made.append(one(rep, out / f"{rep.file_name}{ext}"))
+        for grade, reps in by_grade.items():
+            if not reps:
+                continue
+            if combined:
+                made.append(many(reps, out / f"{grade}{ext}"))
+            else:
+                for rep in reps:
+                    made.append(one(rep, out / grade / f"{rep.file_name}{ext}"))
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in sorted(made, key=lambda p: p.name):     # only this download's files
-            z.write(f, f.name)
+        order = {g: i for i, g in enumerate(GRADE_ORDER)}
+        for f in sorted(made, key=lambda p: (order[p.stem if combined else p.parent.name], p.name)):
+            z.write(f, f.relative_to(out).as_posix())     # only this download's files
     buf.seek(0)
     resp = send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"Test certificates {stamp[:10]}.zip")

@@ -1,4 +1,4 @@
-"""Write reports as PDF, drawn to match Excel's print of templates/test_report.xlsx.
+"""Write reports as PDF, drawn to match Excel's print of the company's template.
 
     write_pdf(report, "MP100-019.pdf")            # one certificate
     write_pdf_combined(reports, "All.pdf")        # one page per certificate
@@ -16,9 +16,10 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+from openpyxl.utils import column_index_from_string
 
-from app.layout import TABLE_SHIFT_X, THIN_LINE, Layout, load_layout, merged_area_of
-from app.report import Report
+from app.layout import TABLE_SHIFT_X, THIN_LINE, Layout, load_layout
+from app.report import MARKUP, SYMBOLS, Report
 
 ROOT = Path(__file__).resolve().parent.parent
 FONT_DIR = Path("C:/Windows/Fonts")
@@ -28,6 +29,7 @@ FONT_FILES = {
     "Cambria": ("cambria.ttc", "cambriab.ttf", "cambriai.ttf", "cambriaz.ttf"),
     "Calibri": ("calibri.ttf", "calibrib.ttf", "calibrii.ttf", "calibriz.ttf"),
     "Arial": ("arial.ttf", "arialbd.ttf", "ariali.ttf", "arialbi.ttf"),
+    "Wingdings": ("wingding.ttf",) * 4,
 }
 BUILTIN = ("Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic")
 
@@ -36,8 +38,6 @@ LINE_SPACING = 1.265        # line height in font sizes, as measured in Excel's 
 BASELINE = 0.975            # baseline below the top of its line, in font sizes (fitted to Excel's PDF)
 SUPER_SIZE = 0.67           # superscript size and rise, as measured in Excel's PDF
 SUPER_RISE = 0.41
-SIGNATURE_HEIGHT = 48.0     # points (64 px in the Excel file)
-SIGNATURE_LIFT = 4.5        # points above the top of the "Tested by" row (6 px)
 SUPERSCRIPT = re.compile(r"\^\{([^}]*)\}")
 
 _registered: dict[tuple, str] = {}
@@ -62,21 +62,30 @@ def font_for(name: str, bold: bool, italic: bool) -> str:
     return rl_name
 
 
-def _segments(text: str) -> list[tuple[str, bool]]:
-    """'Kgs/Cm^{2}' -> [('Kgs/Cm', False), ('2', True)]"""
+def _segments(text: str) -> list[tuple[str, str]]:
+    """'Kgs/Cm^{2}' -> [('Kgs/Cm', ''), ('2', 'sup')]; 'Works ✆' -> [('Works ', ''), ('✆', 'sym')]"""
     out, pos = [], 0
-    for m in SUPERSCRIPT.finditer(text):
+    for m in MARKUP.finditer(text):
         if m.start() > pos:
-            out.append((text[pos:m.start()], False))
-        out.append((m.group(1), True))
+            out.append((text[pos:m.start()], ""))
+        out.append((m.group(1), "sup") if m.group(1) is not None else (m.group(2), "sym"))
         pos = m.end()
     if pos < len(text):
-        out.append((text[pos:], False))
+        out.append((text[pos:], ""))
     return out
 
 
+def _run(text: str, kind: str, font: str, size: float) -> tuple[str, str, float]:
+    """(text to draw, reportlab font, size) of one segment; symbols in their own font (symbol
+    fonts like Wingdings keep their characters at 0xF000 + code)."""
+    if kind == "sym":
+        sym_font, char = SYMBOLS[text]
+        return chr(0xF000 + ord(char)), font_for(sym_font, False, False), size
+    return text, font, size * (SUPER_SIZE if kind == "sup" else 1)
+
+
 def _width(segs, font, size) -> float:
-    return sum(pdfmetrics.stringWidth(t, font, size * (SUPER_SIZE if sup else 1)) for t, sup in segs)
+    return sum(pdfmetrics.stringWidth(*_run(t, kind, font, size)) for t, kind in segs)
 
 
 def _wrap(text: str, font: str, size: float, width: float) -> list[str]:
@@ -146,21 +155,23 @@ def _draw_page(c: canvas.Canvas, report: Report, lay: Layout) -> None:
             else:
                 x = box.x + CELL_PAD
             baseline = top + i * leading + size * BASELINE
-            for text, sup in segs:
-                s = size * (SUPER_SIZE if sup else 1)
-                c.setFont(font, s)
-                c.drawString(X(x), Y(baseline - (size * SUPER_RISE if sup else 0)), text)
-                x += pdfmetrics.stringWidth(text, font, s)
+            for text, kind in segs:
+                t, f, s = _run(text, kind, font, size)
+                c.setFont(f, s)
+                c.drawString(X(x), Y(baseline - (size * SUPER_RISE if kind == "sup" else 0)), t)
+                x += pdfmetrics.stringWidth(t, f, s)
 
-    sig = ROOT / report.signature_file
-    if sig.is_file():
-        min_col, min_row, max_col, _ = merged_area_of(report.signature_next_to)
-        x = sum(lay.cols[:max_col])
-        y = sum(lay.rows[:min_row - 1]) - SIGNATURE_LIFT
-        img = ImageReader(str(sig))
+    for pic in report.pictures:
+        x, y = picture_position(lay, pic)
+        img = ImageReader(str(pic.file))
         iw, ih = img.getSize()
-        w = SIGNATURE_HEIGHT * iw / ih
-        c.drawImage(img, X(x), Y(y + SIGNATURE_HEIGHT), w, SIGNATURE_HEIGHT, mask="auto")
+        c.drawImage(img, X(x), Y(y + pic.height), pic.height * iw / ih, pic.height, mask="auto")
+
+
+def picture_position(lay: Layout, pic) -> tuple[float, float]:
+    """Top-left of a picture in points from the table's top-left corner."""
+    col, row = column_index_from_string(pic.cell.rstrip("0123456789")), int(pic.cell.lstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+    return sum(lay.cols[:col - 1]) + pic.dx, sum(lay.rows[:row - 1]) + pic.dy
 
 
 def _canvas(path: Path, title: str) -> canvas.Canvas:
@@ -174,7 +185,7 @@ def _canvas(path: Path, title: str) -> canvas.Canvas:
 def write_pdf(report: Report, path: str | Path) -> Path:
     path = Path(path)
     c = _canvas(path, f"Test certificate {report.file_name}")
-    _draw_page(c, report, load_layout())
+    _draw_page(c, report, load_layout(report.template))
     c.showPage()
     c.save()
     return path
@@ -183,9 +194,8 @@ def write_pdf(report: Report, path: str | Path) -> Path:
 def write_pdf_combined(reports: list[Report], path: str | Path) -> Path:
     path = Path(path)
     c = _canvas(path, "Test certificates")
-    lay = load_layout()
     for report in reports:
-        _draw_page(c, report, lay)
+        _draw_page(c, report, load_layout(report.template))
         c.showPage()
     c.save()
     return path
