@@ -1,35 +1,46 @@
 {% extends "base.html" %}
 {% block main %}
-<h1>Make test certificates for new entries</h1>
-<p class="lead">Choose the production register you last made certificates from, and the register as it is now.
-  Only entries added since then get a certificate.</p>
+<section class="intro">
+  <h1>Make test certificates for new entries</h1>
+  <p class="lead">Choose the production register you last made certificates from, and the register as it is now.
+    Only entries added since then get a certificate.</p>
+</section>
 
 {% if error %}<p class="notice stop" role="alert">{{ error }}</p>{% endif %}
 
 <form class="choose" method="post" action="{{ url_for('check_entries') }}" enctype="multipart/form-data">
-  <label class="company">
-    <span class="company-label">Company</span>
+  <label class="field company">
+    <span class="field-label">Company</span>
     <select name="company" required>
       {% for id, name in companies %}
       <option value="{{ id }}"{% if id == chosen %} selected{% endif %}>{{ name }}</option>
       {% endfor %}
     </select>
   </label>
+
   <div class="files">
     <label class="file">
+      <span class="file-tag">1</span>
       <span class="file-title">Old register</span>
       <span class="file-help">The copy from last time</span>
       <span class="file-name" data-empty="No file chosen">No file chosen</span>
+      <span class="file-pick">Choose file or drop it here</span>
       <input type="file" name="old" accept=".xls,.xlsx" required>
     </label>
+    <span class="files-join" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h14M13 6l6 6-6 6"/></svg></span>
     <label class="file">
+      <span class="file-tag">2</span>
       <span class="file-title">New register</span>
-      <span class="file-help">With today's entries</span>
+      <span class="file-help">With today’s entries</span>
       <span class="file-name" data-empty="No file chosen">No file chosen</span>
+      <span class="file-pick">Choose file or drop it here</span>
       <input type="file" name="new" accept=".xls,.xlsx" required>
     </label>
   </div>
-  <button class="primary" type="submit">Find new entries</button>
+
+  <div class="go-row">
+    <button class="btn btn-primary" type="submit">Find new entries</button>
+  </div>
 </form>
 {% endblock %}
 
@@ -51,7 +62,7 @@
   });
   document.querySelector("form.choose").addEventListener("submit", function (e) {
     var b = e.target.querySelector("button");
-    b.disabled = true; b.textContent = "Reading the registers…";
+    b.disabled = true; b.setAttribute("aria-busy", "true"); b.textContent = "Reading the registers…";
   });
 </script>
 {% endblock %}

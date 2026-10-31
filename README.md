@@ -27,7 +27,7 @@ flowchart LR
 |:-:|---|---|
 | 1 | **Choose files** | Pick the company, then the old and new register |
 | 2 | **Check entries** | See the new entries; untick any, edit the Report No. |
-| 3 | **Download** | Choose formats + *one file per certificate* or *one file per grade* |
+| 3 | **Download** | In the side panel: Report 1 and/or 2, formats, *one file per certificate* or *one file per grade* |
 
 The ZIP comes out sorted by grade:
 
@@ -41,6 +41,17 @@ Test certificates 2026-10-30.zip
 **Report 2** (testing record) can be made instead of or with the certificates: the same entries and values, 4 side by side per sheet, all in one Excel file. An earlier, incomplete Report 2 can be uploaded so its free columns are filled first.
 
 Rows the app can't certify (an unknown size, an empty size…) are listed with the reason, never silently dropped.
+
+### Look
+
+| | |
+|---|---|
+| **Theme** | Light: warm paper, ink, a tangerine key for the one main action, green for done |
+| **Check screen** | Entries on a ruled sheet; the job sheet (tally, reports, formats, download) stays beside them |
+| **Fonts** | Red Hat Display / Text / Mono, bundled in `app/static/fonts/`, so it works offline |
+| **CSS** | `tokens.css` (colours, sizes) → `base.css` (shared rules) → `style.css` (the screens) |
+
+Design notes: [docs/web-design.md](docs/web-design.md).
 
 ---
 
@@ -119,6 +130,7 @@ flowchart LR
     R --> X["render_excel.py"]
     R --> PDF["render_pdf.py"]
     R --> WD["render_word.py"]
+    R --> R2["report2.py<br/>4 entries per sheet"]
     L["layout.py<br/>template grid"] --> PDF
     L --> WD
     ST["settings.py"] -.-> R
@@ -127,8 +139,9 @@ flowchart LR
 | Path | What's there |
 |---|---|
 | `app/` | the code above |
-| `config/settings.json` | **everything editable**: companies, cells, ranges, texts |
-| `templates/*.xlsx` | certificate templates (one per company header) |
+| `app/templates/`, `app/static/` | the three screens, CSS, fonts, logo |
+| `config/settings.json` | **everything editable**: companies, cells, ranges, texts, Report 2 rows |
+| `templates/*.xlsx` | certificate templates (one per company header) and `report2.xlsx` |
 | `data/is4984_chart.json` | the IS 4984 weight chart |
 | `tools/` | template builders, chart import, sample data, comparison tools |
 | `tests/` | `python tests/run_all.py` |

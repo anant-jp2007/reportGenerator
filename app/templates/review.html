@@ -1,92 +1,109 @@
 {% extends "base.html" %}
 {% block title %}Check entries{% endblock %}
 {% block main %}
+{% set skipped = groups|map(attribute='skipped')|sum(start=[]) %}
 <div id="review">
-  <h1>{% if total %}{{ total }} new {{ "entry" if total == 1 else "entries" }} to certify{% else %}No new entries{% endif %}</h1>
-  <p class="lead">For <strong>{{ company_name }}</strong>. Compared <strong>{{ names.old }}</strong> with <strong>{{ names.new }}</strong>.
-    {% if total %}Untick any entry you don't want, change a Report No. if needed, then download.{% endif %}</p>
+  <section class="intro">
+    <h1>{% if total %}{{ total }} new {{ "entry" if total == 1 else "entries" }} to certify{% else %}No new entries{% endif %}</h1>
+    <p class="lead">For <strong>{{ company_name }}</strong>. Compared <strong>{{ names.old }}</strong> with <strong>{{ names.new }}</strong>.
+      {% if total %}Untick any entry you don’t want, change a Report No. if needed, then download.{% endif %}</p>
+    {% if skipped %}
+    <p class="jump"><a href="#skipped">{{ skipped|length }} {{ "entry has" if skipped|length == 1 else "entries have" }} no certificate: see why</a></p>
+    {% endif %}
+  </section>
 
   {% for e in errors %}<p class="notice stop" role="alert">{{ e }}</p>{% endfor %}
 
   {% if total %}
-  <form id="make" method="post" action="{{ url_for('download') }}" enctype="multipart/form-data">
+  <form id="make" class="make" method="post" action="{{ url_for('download') }}" enctype="multipart/form-data">
     <input type="hidden" name="token" value="{{ token }}">
-    <table class="entries">
-      <thead>
-        <tr>
-          <th class="tick"><input type="checkbox" id="all" checked aria-label="Tick all entries"></th>
-          <th>Report No.</th>
-          <th class="num">Sr.</th>
-          <th>Date</th>
-          <th>Size</th>
-          <th>Batch</th>
-          <th>File</th>
-        </tr>
-      </thead>
-      {% for g in groups if g.rows %}
-      <tbody>
-        <tr class="grade"><th colspan="7" scope="rowgroup">{{ g.grade }}</th></tr>
-        {% for r, number in g.rows %}
-        {% set id = row_id(r) %}
-        <tr class="entry{% if r.warnings %} has-note{% endif %}">
-          <td class="tick"><input type="checkbox" name="row" value="{{ id }}" checked aria-label="Make certificate for Sr. {{ r.sr_no }}"></td>
-          <td><input class="report-no" name="no-{{ id }}" value="{{ number }}" aria-label="Report No. for Sr. {{ r.sr_no }}"></td>
-          <td class="num">{{ r.sr_no }}</td>
-          <td class="nowrap">{{ r.date.strftime('%d-%m-%Y') if r.date else "–" }}</td>
-          <td>{{ r.size_text }}</td>
-          <td class="nowrap">{{ r.batch or "–" }}</td>
-          <td class="quiet">{{ (r.report_no or (r.grade.replace(' ', '') ~ '-row' ~ r.excel_row)).replace('/', '-') }}.xlsx</td>
-        </tr>
-        {% if r.warnings %}
-        <tr class="note"><td></td><td colspan="6">{% for w in r.warnings %}{{ w[0]|upper }}{{ w[1:] }}.{% if not loop.last %} {% endif %}{% endfor %}</td></tr>
-        {% endif %}
+    <div class="ledger">
+      <table class="entries">
+        <thead>
+          <tr>
+            <th class="tick"><input type="checkbox" id="all" checked aria-label="Tick all entries"></th>
+            <th class="pin">Report No.</th>
+            <th class="num">Sr.</th>
+            <th>Date</th>
+            <th>Size</th>
+            <th>Batch</th>
+            <th>File</th>
+          </tr>
+        </thead>
+        {% for g in groups if g.rows %}
+        <tbody>
+          <tr class="grade"><th colspan="7" scope="rowgroup"><span class="grade-name">{{ g.grade }}</span></th></tr>
+          {% for r, number in g.rows %}
+          {% set id = row_id(r) %}
+          <tr class="entry{% if r.warnings %} has-note{% endif %}">
+            <td class="tick"><input type="checkbox" name="row" value="{{ id }}" checked aria-label="Make certificate for Sr. {{ r.sr_no }}"></td>
+            <td class="pin"><input class="report-no" name="no-{{ id }}" value="{{ number }}" aria-label="Report No. for Sr. {{ r.sr_no }}"></td>
+            <td class="num">{{ r.sr_no }}</td>
+            <td class="fig nowrap">{% if r.date %}{{ r.date.strftime('%d-%m-%Y') }}{% else %}<span class="none">no date</span>{% endif %}</td>
+            <td class="fig size">{{ r.size_text }}</td>
+            <td class="fig nowrap">{% if r.batch %}{{ r.batch }}{% else %}<span class="none">none</span>{% endif %}</td>
+            <td class="file-col">{{ (r.report_no or (r.grade.replace(' ', '') ~ '-row' ~ r.excel_row)).replace('/', '-') }}.xlsx</td>
+          </tr>
+          {% if r.warnings %}
+          <tr class="note"><td></td><td colspan="6"><span class="note-text">{% for w in r.warnings %}{{ w[0]|upper }}{{ w[1:] }}.{% if not loop.last %} {% endif %}{% endfor %}</span></td></tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
         {% endfor %}
-      </tbody>
-      {% endfor %}
-    </table>
-
-    <fieldset class="choice">
-      <legend>Report</legend>
-      <input type="hidden" name="report_choice" value="1">
-      <label><input type="checkbox" name="report" value="1" checked> Report 1: a certificate for each entry</label>
-      <label><input type="checkbox" name="report" value="2"> Report 2: testing record, 4 entries per sheet, one Excel file</label>
-    </fieldset>
-
-    <div id="r2-options" hidden>
-      <label class="file">
-        <span class="file-title">Incomplete Report 2 <span class="quiet">(optional)</span></span>
-        <span class="file-help">An earlier Report 2 whose last sheet has free columns: they are filled first</span>
-        <span class="file-name" data-empty="No file chosen">No file chosen</span>
-        <input type="file" name="incomplete" accept=".xls,.xlsx">
-      </label>
+      </table>
     </div>
 
-    <div id="r1-options">
-    <fieldset class="choice">
-      <legend>Format</legend>
-      <input type="hidden" name="format_choice" value="1">
-      <label><input type="checkbox" name="format" value="pdf" checked> PDF</label>
-      <label><input type="checkbox" name="format" value="excel"> Excel</label>
-      <label><input type="checkbox" name="format" value="word"> Word</label>
-    </fieldset>
+    <aside class="panel" aria-label="What to make">
+      <p class="tally" id="tally">{{ total }} of {{ total }} ticked</p>
 
-    <fieldset class="choice">
-      <legend>Files</legend>
-      <label><input type="radio" name="files" value="each" checked> A file for each certificate</label>
-      <label><input type="radio" name="files" value="one"> One file per grade</label>
-    </fieldset>
-    </div>
+      <fieldset class="seg-group">
+        <legend>Report</legend>
+        <input type="hidden" name="report_choice" value="1">
+        <div class="seg seg-stack">
+          <input type="checkbox" id="rep-1" name="report" value="1" checked><label for="rep-1"><b>Report 1</b> a certificate for each entry</label>
+          <input type="checkbox" id="rep-2" name="report" value="2"><label for="rep-2"><b>Report 2</b> testing record, 4 entries per sheet, one Excel file</label>
+        </div>
+      </fieldset>
 
-    <button class="primary" type="submit" id="go">Download {{ total }} {{ "certificate" if total == 1 else "certificates" }}</button>
+      <div id="r2-options" hidden>
+        <label class="file file-small">
+          <span class="file-title">Incomplete Report 2 <span class="quiet">(optional)</span></span>
+          <span class="file-help">An earlier Report 2 whose last sheet has free columns: they are filled first</span>
+          <span class="file-name" data-empty="No file chosen">No file chosen</span>
+          <input type="file" name="incomplete" accept=".xls,.xlsx">
+        </label>
+      </div>
+
+      <div id="r1-options">
+        <fieldset class="seg-group">
+          <legend>Format</legend>
+          <input type="hidden" name="format_choice" value="1">
+          <div class="seg">
+            <input type="checkbox" id="fmt-pdf" name="format" value="pdf" checked><label for="fmt-pdf">PDF</label>
+            <input type="checkbox" id="fmt-excel" name="format" value="excel"><label for="fmt-excel">Excel</label>
+            <input type="checkbox" id="fmt-word" name="format" value="word"><label for="fmt-word">Word</label>
+          </div>
+        </fieldset>
+
+        <fieldset class="seg-group">
+          <legend>Files</legend>
+          <div class="seg">
+            <input type="radio" id="files-each" name="files" value="each" checked><label for="files-each">A file for each certificate</label>
+            <input type="radio" id="files-one" name="files" value="one"><label for="files-one">One file per grade</label>
+          </div>
+        </fieldset>
+      </div>
+
+      <button class="btn btn-primary btn-wide" type="submit" id="go">Download {{ total }} {{ "certificate" if total == 1 else "certificates" }}</button>
+    </aside>
   </form>
   {% else %}
-  <p>Every entry in the new register was already in the old one. If you expected new entries, check that the
-    files aren't swapped: the old register goes on the left.</p>
+  <p class="empty">Every entry in the new register was already in the old one. If you expected new entries, check that the
+    files aren’t swapped: the old register goes on the left.</p>
   {% endif %}
 
-  {% set skipped = groups|map(attribute='skipped')|sum(start=[]) %}
   {% if skipped %}
-  <section class="skipped">
+  <section class="skipped" id="skipped">
     <h2>No certificate for {{ skipped|length }} {{ "entry" if skipped|length == 1 else "entries" }}</h2>
     <p class="quiet">Correct these in the register and choose the files again.</p>
     <ul>
@@ -104,13 +121,16 @@
   </section>
   {% endif %}
 
-  <p class="again"><a href="{{ url_for('choose_files') }}">Choose other files</a></p>
+  <p class="again"><a class="btn btn-quiet" href="{{ url_for('choose_files') }}">Choose other files</a></p>
 </div>
 
 <div id="done" hidden>
-  <h1 id="done-title">Certificates downloaded</h1>
-  <p class="lead" id="done-text"></p>
-  <p><a class="primary" href="{{ url_for('choose_files') }}">Make more certificates</a></p>
+  <section class="done-card">
+    <svg class="done-mark" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"/><path d="M14.5 24.6l6.4 6.4 12.6-13.4"/></svg>
+    <h1 id="done-title">Certificates downloaded</h1>
+    <p class="lead" id="done-text"></p>
+    <p><a class="btn btn-primary" href="{{ url_for('choose_files') }}">Make more certificates</a></p>
+  </section>
 </div>
 {% endblock %}
 
@@ -119,7 +139,7 @@
 (function () {
   var form = document.getElementById("make");
   if (!form) return;
-  var all = document.getElementById("all"), go = document.getElementById("go");
+  var all = document.getElementById("all"), go = document.getElementById("go"), tally = document.getElementById("tally");
   var boxes = Array.prototype.slice.call(form.querySelectorAll("input[name=row]"));
 
   var r1 = form.querySelector("input[name=report][value='1']"), r2 = form.querySelector("input[name=report][value='2']");
@@ -134,6 +154,7 @@
     var n = boxes.filter(function (b) { return b.checked; }).length;
     document.getElementById("r1-options").hidden = !r1.checked;
     document.getElementById("r2-options").hidden = !r2.checked;
+    tally.textContent = n + " of " + boxes.length + " ticked";
     var what = r1.checked ? (n === 1 ? " certificate" : " certificates") : (n === 1 ? " entry in Report 2" : " entries in Report 2");
     go.textContent = !n ? "Tick an entry to download" : !(r1.checked || r2.checked) ? "Tick Report 1 or Report 2"
       : "Download " + n + what + (r1.checked && r2.checked ? " + Report 2" : "");
@@ -149,7 +170,7 @@
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     var label = go.textContent;
-    go.disabled = true; go.textContent = "Making certificates…";
+    go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Making certificates…";
     fetch(form.action, { method: "POST", body: new FormData(form) }).then(function (res) {
       if (!res.ok) return res.text().then(function (html) { document.open(); document.write(html); document.close(); });
       var n = res.headers.get("X-Certificates"), where = res.headers.get("X-Saved-To");
@@ -169,11 +190,11 @@
         document.getElementById("done").hidden = false;
         var steps = document.querySelectorAll(".steps li");
         steps[1].removeAttribute("aria-current"); steps[1].classList.add("done");
-        steps[2].setAttribute("aria-current", "step");
+        steps[2].setAttribute("aria-current", "step"); steps[2].classList.add("done");
         window.scrollTo(0, 0);
       });
     }).catch(function () {
-      go.disabled = false; go.textContent = label;
+      go.disabled = false; go.removeAttribute("aria-busy"); go.textContent = label;
       alert("The app stopped responding. Check that its black window is still open, then try again.");
     });
   });

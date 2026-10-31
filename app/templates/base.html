@@ -4,32 +4,39 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Test certificates{% endblock %}</title>
+  <meta name="description" content="Make IS 4984 test certificates for the new entries in a production register.">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='mark.svg') }}">
 </head>
 <body>
-  <header class="masthead">
-    <a class="brand" href="{{ url_for('choose_files') }}">
-      <svg class="mark" viewBox="0 0 40 24" aria-hidden="true">
-        <path class="mark-pipe" d="M4 3h29a7 9 0 0 1 0 18H4z"/>
-        <ellipse class="mark-bore" cx="33" cy="12" rx="4.2" ry="6.4"/>
-        <rect class="mark-stripe" x="4" y="6" width="25" height="1.6"/>
-        <rect class="mark-stripe" x="4" y="11.2" width="25" height="1.6"/>
-        <rect class="mark-stripe" x="4" y="16.4" width="25" height="1.6"/>
-      </svg>
-      <span>
-        <span class="brand-tool">Test certificates</span>
-        <span class="brand-sub">HDPE pipes, IS 4984</span>
-      </span>
-    </a>
-    <ol class="steps" aria-label="Steps">
-      {% for label in ["Choose files", "Check entries", "Download"] %}
-      <li{% if loop.index == step %} aria-current="step"{% elif loop.index < step %} class="done"{% endif %}>{{ label }}</li>
-      {% endfor %}
-    </ol>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="topbar">
+    <div class="topbar-in">
+      <a class="brand" href="{{ url_for('choose_files') }}" aria-label="Test certificates, start again">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle class="mark-wall" cx="16" cy="16" r="15"/>
+          <circle class="mark-bore" cx="16" cy="16" r="9.5"/>
+          <path class="mark-tick" d="M11.6 16.4l3 3 6-6.4"/>
+        </svg>
+        <span class="brand-text">
+          <span class="brand-tool">Test certificates</span>
+          <span class="brand-sub">HDPE pipes, IS 4984</span>
+        </span>
+      </a>
+      <ol class="steps" aria-label="Steps">
+        {% for label in ["Choose files", "Check entries", "Download"] %}
+        <li{% if loop.index == step %} aria-current="step"{% elif loop.index < step %} class="done"{% endif %}>
+          <span class="step-key" aria-hidden="true"><span class="step-n">{{ loop.index }}</span><svg class="step-tick" viewBox="0 0 16 16"><path d="M3.5 8.4l3 3 6-6.6"/></svg></span>
+          <span class="step-label">{{ label }}</span>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
   </header>
   <main>
+    <div class="page" id="content">
     {% block main %}{% endblock %}
+    </div>
   </main>
   {% block scripts %}{% endblock %}
 </body>
