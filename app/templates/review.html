@@ -5,7 +5,7 @@
 <div id="review">
   <section class="intro">
     <h1>{% if total %}{{ total }} new {{ "entry" if total == 1 else "entries" }} to certify{% else %}No new entries{% endif %}</h1>
-    <p class="lead">For <strong>{{ company_name }}</strong>. Compared <strong>{{ names.old }}</strong> with <strong>{{ names.new }}</strong>.
+    <p class="lead">For <strong>{{ company_name }}</strong>. {% if record %}Checked <strong>{{ names.new }}</strong> against the record of certified entries.{% else %}Compared <strong>{{ names.old }}</strong> with <strong>{{ names.new }}</strong>.{% endif %}
       {% if total %}Untick any entry you don’t want, change a Report No. if needed, then download.{% endif %}</p>
     {% if skipped %}
     <p class="jump"><a href="#skipped">{{ skipped|length }} {{ "entry has" if skipped|length == 1 else "entries have" }} no certificate: see why</a></p>
@@ -28,11 +28,12 @@
             <th>Size</th>
             <th>Batch</th>
             <th>File</th>
+            <th class="view-col">Certificate</th>
           </tr>
         </thead>
         {% for g in groups if g.rows %}
         <tbody>
-          <tr class="grade"><th colspan="7" scope="rowgroup"><span class="grade-name">{{ g.grade }}</span></th></tr>
+          <tr class="grade"><th colspan="8" scope="rowgroup"><span class="grade-name">{{ g.grade }}</span></th></tr>
           {% for r, number in g.rows %}
           {% set id = row_id(r) %}
           <tr class="entry{% if r.warnings %} has-note{% endif %}">
@@ -43,9 +44,10 @@
             <td class="fig size">{{ r.size_text }}</td>
             <td class="fig nowrap">{% if r.batch %}{{ r.batch }}{% else %}<span class="none">none</span>{% endif %}</td>
             <td class="file-col">{{ (r.report_no or (r.grade.replace(' ', '') ~ '-row' ~ r.excel_row)).replace('/', '-') }}.xlsx</td>
+            <td class="view-col"><button type="button" class="view" data-rid="{{ id }}" data-title="Sr. {{ r.sr_no }}, {{ r.size_text }}" data-grade="{{ g.grade }}">View</button><span class="edited-tag" hidden>Edited</span><span class="vals"></span></td>
           </tr>
           {% if r.warnings %}
-          <tr class="note"><td></td><td colspan="6"><span class="note-text">{% for w in r.warnings %}{{ w[0]|upper }}{{ w[1:] }}.{% if not loop.last %} {% endif %}{% endfor %}</span></td></tr>
+          <tr class="note"><td></td><td colspan="7"><span class="note-text">{% for w in r.warnings %}{{ w[0]|upper }}{{ w[1:] }}.{% if not loop.last %} {% endif %}{% endfor %}</span></td></tr>
           {% endif %}
           {% endfor %}
         </tbody>
@@ -98,8 +100,13 @@
     </aside>
   </form>
   {% else %}
+  {% if record %}
+  <p class="empty">Every entry in the register already got a certificate. If you expected new entries, check that
+    this is the latest register.</p>
+  {% else %}
   <p class="empty">Every entry in the new register was already in the old one. If you expected new entries, check that the
     files aren’t swapped: the old register goes on the left.</p>
+  {% endif %}
   {% endif %}
 
   {% if skipped %}
@@ -124,11 +131,34 @@
   <p class="again"><a class="btn btn-quiet" href="{{ url_for('choose_files') }}">Choose other files</a></p>
 </div>
 
+{% if total %}
+<dialog class="viewer" id="viewer" aria-labelledby="viewer-title">
+  <div class="viewer-head">
+    <div class="viewer-name">
+      <h2 id="viewer-title">Certificate</h2>
+      <p class="viewer-sub" id="viewer-sub"></p>
+    </div>
+    <div class="viewer-nav">
+      <button type="button" class="btn btn-quiet" id="viewer-prev">Previous</button>
+      <button type="button" class="btn btn-quiet" id="viewer-next">Next</button>
+      <button type="button" class="btn btn-primary" id="viewer-close">Done</button>
+    </div>
+  </div>
+  <div class="viewer-tools">
+    <p>Click a highlighted value to change it. The downloaded files show exactly this.</p>
+    <button type="button" class="link" id="viewer-reroll">New random values</button>
+    <button type="button" class="link" id="viewer-undo">Undo changes</button>
+  </div>
+  <div class="viewer-body" id="viewer-body"><div class="cert-frame" id="viewer-frame"></div></div>
+</dialog>
+{% endif %}
+
 <div id="done" hidden>
   <section class="done-card">
     <svg class="done-mark" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"/><path d="M14.5 24.6l6.4 6.4 12.6-13.4"/></svg>
     <h1 id="done-title">Certificates downloaded</h1>
     <p class="lead" id="done-text"></p>
+    <p id="done-record"></p>
     <p><a class="btn btn-primary" href="{{ url_for('choose_files') }}">Make more certificates</a></p>
   </section>
 </div>
@@ -184,8 +214,13 @@
         document.getElementById("done-title").textContent = zip
           ? n + (n === "1" ? " certificate downloaded" : " certificates downloaded")
           : "Report 2 downloaded (" + n + (n === "1" ? " entry)" : " entries)");
+        var recorded = res.headers.get("X-Recorded");
         document.getElementById("done-text").textContent =
-          (zip ? "The ZIP file" : "The Excel file") + " is in your Downloads folder. A copy is also saved in " + where;
+          (zip ? "The ZIP file" : "The Excel file") + " is in your Downloads folder. A copy is also saved in " + where + ".";
+        document.getElementById("done-record").textContent = recorded === "ok"
+          ? "These entries are now in the record, so they won’t be listed as new again."
+          : "The record of certified entries was " + recorded + ". Next time, choose the old register too.";
+        document.getElementById("done-record").className = recorded === "ok" ? "quiet" : "notice stop";
         document.getElementById("review").hidden = true;
         document.getElementById("done").hidden = false;
         var steps = document.querySelectorAll(".steps li");
@@ -199,6 +234,115 @@
     });
   });
   count();
+
+  // ---------- preview: see a certificate as it prints, change values, download exactly that ----------
+  // Per entry the page keeps what was first shown (base) and what is shown now (values). The values
+  // are sent with the download as v-<entry>-<cell>, so the files match the preview. Entries never
+  // opened are drawn fresh at download, as before.
+  var viewer = document.getElementById("viewer"), frame = document.getElementById("viewer-frame");
+  var body = document.getElementById("viewer-body"), token = form.querySelector("input[name=token]").value;
+  var views = Array.prototype.slice.call(form.querySelectorAll("button.view"));
+  var state = {}, current = null, asked = 0;
+
+  function numberBox(rid) { return form.querySelector('input[name="no-' + rid + '"]'); }
+  function viewButton(rid) { return views.filter(function (b) { return b.dataset.rid === rid; })[0]; }
+  function inputs() { return Array.prototype.slice.call(frame.querySelectorAll(".cert-in")); }
+
+  function save(rid) {
+    var st = state[rid], cell = viewButton(rid).parentNode, vals = cell.querySelector(".vals");
+    var edited = false;
+    vals.textContent = "";
+    Object.keys(st.values).forEach(function (ref) {
+      var h = document.createElement("input");
+      h.type = "hidden"; h.name = "v-" + rid + "-" + ref; h.value = st.values[ref];
+      vals.appendChild(h);
+      if (st.values[ref] !== st.base[ref]) edited = true;
+    });
+    cell.querySelector(".edited-tag").hidden = !edited;
+    cell.closest("tr").classList.toggle("edited", edited);
+  }
+
+  function fill() {
+    var st = state[current];
+    inputs().forEach(function (i) {
+      i.value = i.dataset.kind === "number" ? numberBox(current).value : st.values[i.dataset.cell];
+    });
+  }
+
+  function fit() {
+    var cert = frame.querySelector(".cert");
+    if (!cert) return;
+    var w = parseFloat(cert.style.width) * 4 / 3, h = parseFloat(cert.style.height) * 4 / 3;
+    var scale = Math.min(1.6, (body.clientWidth - 32) / w);
+    cert.style.transform = "scale(" + scale + ")";
+    frame.style.width = w * scale + "px";
+    frame.style.height = h * scale + "px";
+  }
+
+  function draw(rid, reroll) {
+    var n = ++asked;
+    if (!reroll) frame.innerHTML = '<p class="viewer-wait">Drawing the certificate…</p>';
+    var url = "{{ url_for('preview') }}?token=" + encodeURIComponent(token) + "&row=" + encodeURIComponent(rid)
+      + "&no=" + encodeURIComponent(numberBox(rid).value);
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error(res.status);
+      return res.text();
+    }).then(function (html) {
+      if (n !== asked) return;                   // a newer request (Next pressed quickly) wins
+      var keep = state[rid];
+      frame.innerHTML = html;
+      current = rid;
+      if (!keep || reroll) {
+        var st = keep || { base: {}, values: {} };
+        inputs().forEach(function (i) {
+          var ref = i.dataset.cell, kind = i.dataset.kind;
+          if (kind === "number") return;
+          if (keep && kind !== "test") return;   // new random values: dates and batch stay as they are
+          st.base[ref] = st.values[ref] = i.value;
+        });
+        state[rid] = st;
+      }
+      fill();
+      save(rid);
+      fit();
+    }).catch(function () {
+      if (n === asked) frame.innerHTML = '<p class="viewer-wait">The certificate couldn’t be drawn. Check that the app’s black window is still open.</p>';
+    });
+  }
+
+  function open(rid) {
+    var b = viewButton(rid), i = views.indexOf(b);
+    document.getElementById("viewer-title").textContent = b.dataset.title;
+    document.getElementById("viewer-sub").textContent = b.dataset.grade + ", entry " + (i + 1) + " of " + views.length;
+    document.getElementById("viewer-prev").disabled = i === 0;
+    document.getElementById("viewer-next").disabled = i === views.length - 1;
+    current = rid;
+    if (!viewer.open) viewer.showModal();
+    draw(rid);
+  }
+
+  views.forEach(function (b) { b.addEventListener("click", function () { open(b.dataset.rid); }); });
+  frame.addEventListener("input", function (e) {
+    var i = e.target;
+    if (!i.classList.contains("cert-in") || !current || !state[current]) return;
+    if (i.dataset.kind === "number") numberBox(current).value = i.value;
+    else { state[current].values[i.dataset.cell] = i.value; save(current); }
+  });
+  document.getElementById("viewer-reroll").addEventListener("click", function () { if (state[current]) draw(current, true); });
+  document.getElementById("viewer-undo").addEventListener("click", function () {
+    var st = state[current];
+    if (!st) return;
+    Object.keys(st.base).forEach(function (ref) { st.values[ref] = st.base[ref]; });
+    numberBox(current).value = numberBox(current).defaultValue;
+    fill();
+    save(current);
+  });
+  function step(by) { open(views[views.indexOf(viewButton(current)) + by].dataset.rid); }
+  document.getElementById("viewer-prev").addEventListener("click", function () { step(-1); });
+  document.getElementById("viewer-next").addEventListener("click", function () { step(1); });
+  document.getElementById("viewer-close").addEventListener("click", function () { viewer.close(); });
+  viewer.addEventListener("close", function () { if (current) viewButton(current).focus(); });
+  window.addEventListener("resize", fit);
 })();
 </script>
 {% endblock %}

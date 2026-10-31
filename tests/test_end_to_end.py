@@ -24,7 +24,7 @@ from app import web  # noqa: E402
 from make_sample_registers import make  # noqa: E402
 
 TMP = Path(tempfile.mkdtemp(prefix="e2e_"))
-web.OUTPUT, web.UPLOADS = TMP / "output", TMP / "uploads"
+web.OUTPUT, web.UPLOADS, web.LEDGER = TMP / "output", TMP / "uploads", TMP / "ledger"
 client = web.app.test_client()
 failures = 0
 

@@ -326,16 +326,29 @@ def find_new_rows(old_path, new_path) -> Diff:
             which = "old" if g in new.grades else "new"
             errors.append(f"{which} file: no sheet for {g}, so {g} can't be compared")
     blocked = old.errors.keys() | new.errors.keys() | (old.grades ^ new.grades)
-    def same(r: Row) -> tuple:
-        return r.key, r.date, r.size_text, r.batch
+    fresh = not_covered([match_keys(r) for r in old.rows], [r for r in new.rows if r.grade not in blocked])
+    fresh.sort(key=lambda r: (GRADE_ORDER.index(r.grade), r.excel_row))
+    return Diff(fresh, errors, [f"new file: {n}" for n in new.notes])
 
-    left_same, left_key = Counter(same(r) for r in old.rows), Counter(r.key for r in old.rows)
-    candidates = [r for r in new.rows if r.grade not in blocked]
+
+def match_keys(r: Row) -> tuple[tuple, tuple]:
+    """(key, same): the Sr. No. key, and the key plus what makes two rows identical."""
+    return r.key, (r.key, r.date, r.size_text, r.batch)
+
+
+def not_covered(done: list[tuple[tuple, tuple]], rows: list[Row]) -> list[Row]:
+    """The rows not covered by `done` (match_keys of rows already dealt with), in their order.
+
+    Each done item covers one row: an identical row first (so an edited duplicate is the new one),
+    then any row with the same Sr. No. key (edited rows stay done). Extra rows with a key are new.
+    """
+    left_same, left_key = Counter(s for _, s in done), Counter(k for k, _ in done)
     unmatched = []
-    for r in candidates:                    # identical rows first: an edited duplicate is the new one
-        if left_same[same(r)]:
-            left_same[same(r)] -= 1
-            left_key[r.key] -= 1
+    for r in rows:                          # identical rows first: an edited duplicate is the new one
+        key, same = match_keys(r)
+        if left_same[same]:
+            left_same[same] -= 1
+            left_key[key] -= 1
         else:
             unmatched.append(r)
     fresh = []
@@ -344,5 +357,4 @@ def find_new_rows(old_path, new_path) -> Diff:
             left_key[r.key] -= 1
         else:
             fresh.append(r)
-    fresh.sort(key=lambda r: (GRADE_ORDER.index(r.grade), r.excel_row))
-    return Diff(fresh, errors, [f"new file: {n}" for n in new.notes])
+    return fresh

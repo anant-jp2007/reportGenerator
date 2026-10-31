@@ -20,6 +20,7 @@ REAL = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "data/source/productio
 TMP = Path(tempfile.mkdtemp(prefix="webtest_"))
 web.OUTPUT = TMP / "output"
 web.UPLOADS = TMP / "uploads"
+web.LEDGER = TMP / "ledger"
 client = web.app.test_client()
 
 

@@ -23,6 +23,7 @@
           <span class="brand-sub">HDPE pipes, IS 4984</span>
         </span>
       </a>
+      {% if step %}
       <ol class="steps" aria-label="Steps">
         {% for label in ["Choose files", "Check entries", "Download"] %}
         <li{% if loop.index == step %} aria-current="step"{% elif loop.index < step %} class="done"{% endif %}>
@@ -31,6 +32,7 @@
         </li>
         {% endfor %}
       </ol>
+      {% endif %}
     </div>
   </header>
   <main>

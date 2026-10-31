@@ -11,8 +11,9 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TESTS = ["test_settings.py", "test_chart.py", "test_production.py", "test_report.py",
-         "test_report2.py", "test_excel.py", "test_pdf.py", "test_word.py", "test_web.py", "test_end_to_end.py"]
+TESTS = ["test_settings.py", "test_chart.py", "test_production.py", "test_ledger.py", "test_report.py",
+         "test_report2.py", "test_excel.py", "test_preview.py", "test_pdf.py", "test_word.py", "test_web.py", "test_new_company.py",
+         "test_end_to_end.py"]
 
 
 def main() -> int:

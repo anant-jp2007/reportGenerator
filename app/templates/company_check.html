@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Add a company{% endblock %}
+{% block main %}
+<section class="intro">
+  <h1>Check the header</h1>
+  <p class="lead">This is how certificates for <strong>{{ draft.name }}</strong> will look. Correct any row on the
+    left and press <em>Show again</em>; when it looks right, add the company.</p>
+</section>
+
+{% if error %}<p class="notice stop" role="alert">{{ error }}</p>{% endif %}
+{% for n in notes %}<p class="notice">{{ n }}</p>{% endfor %}
+
+<div class="company-check">
+  <form class="header-rows" method="post" action="{{ url_for('update_company') }}" enctype="multipart/form-data">
+    <input type="hidden" name="token" value="{{ token }}">
+    <label class="field text">
+      <span class="field-label">Name in the company menu</span>
+      <input type="text" name="name" value="{{ draft.name }}" maxlength="60" required autocomplete="off">
+    </label>
+
+    {% set labels = ["Row 1 · company name", "Row 2", "Row 3", "Row 4 · phone, email", "Row 5 · certificate title"] %}
+    {% for i in range(5) %}
+    <fieldset class="hrow">
+      <legend>{{ labels[i] }}</legend>
+      <textarea name="text{{ i + 1 }}" rows="{{ [1, (draft.texts[i]|length // 42) + draft.texts[i].count('\n') + 1]|max }}"
+                aria-label="{{ labels[i] }} text" spellcheck="false">{{ draft.texts[i] }}</textarea>
+      <div class="hrow-opts">
+        <label>Size <input type="number" name="size{{ i + 1 }}" value="{{ '%g'|format(draft.sizes[i]) }}" min="6" max="30" step="0.5"></label>
+        <label><input type="checkbox" name="bold{{ i + 1 }}"{% if draft.bold[i] %} checked{% endif %}> Bold</label>
+      </div>
+    </fieldset>
+    {% endfor %}
+
+    <fieldset class="hrow pics">
+      <legend>Pictures</legend>
+      <label class="pic">Logo: {{ "found" if has_logo else "none" }}
+        <input type="file" name="logo" accept=".png,.jpg,.jpeg,.bmp,.gif" aria-label="Replace the logo"></label>
+      {% if has_logo %}<label><input type="checkbox" name="remove_logo"> Remove the logo</label>{% endif %}
+      <label class="pic">Stamp: {{ "found" if has_stamp else "none" }}
+        <input type="file" name="stamp" accept=".png,.jpg,.jpeg,.bmp,.gif" aria-label="Replace the stamp"></label>
+      {% if has_stamp %}<label><input type="checkbox" name="remove_stamp"> Remove the stamp</label>{% endif %}
+      <label><input type="checkbox" name="tested_by"{% if draft.tested_by %} checked{% endif %}> Keep “Tested by :-” at the bottom</label>
+    </fieldset>
+    <p class="hint">Size is in points, as in Excel. Sizes are made smaller by themselves if the header doesn't fit the page.</p>
+
+    <div class="go-row">
+      <button class="btn" type="submit">Show again</button>
+    </div>
+  </form>
+
+  <aside class="company-side">
+    <div class="sample-sheet" id="sample-sheet">
+      {% if sheet %}<div class="cert-frame" id="sample-frame">{{ sheet }}</div>
+      {% else %}<p class="viewer-wait">The sample certificate can't be drawn until the problem above is fixed.</p>{% endif %}
+    </div>
+    <form class="go-row add-row" method="post" action="{{ url_for('save_new_company') }}">
+      <input type="hidden" name="token" value="{{ token }}">
+      <button class="btn btn-primary" type="submit"{% if not sheet %} disabled{% endif %}>Add {{ draft.name }}</button>
+      <a class="link" href="{{ url_for('choose_files') }}">Cancel</a>
+    </form>
+    <p class="hint">The sample entry (PE 100, 63 mm, PN 10) is made up, only to show the page.</p>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var frame = document.getElementById("sample-frame"), body = document.getElementById("sample-sheet");
+    function fit() {
+      var cert = frame && frame.querySelector(".cert");
+      if (!cert) return;
+      var w = parseFloat(cert.style.width) * 4 / 3, h = parseFloat(cert.style.height) * 4 / 3;
+      var scale = Math.min(1.2, (body.clientWidth - 32) / w);
+      cert.style.transform = "scale(" + scale + ")";
+      frame.style.width = w * scale + "px";
+      frame.style.height = h * scale + "px";
+    }
+    window.addEventListener("resize", fit);
+    fit();
+    // the text changed but "Show again" wasn't pressed: adding would use the last shown version
+    var rows = document.querySelector("form.header-rows"), add = document.querySelector(".add-row button");
+    rows.addEventListener("input", function () {
+      if (add.disabled) return;
+      add.disabled = true; add.dataset.wait = "1";
+      add.textContent = "Press “Show again” first";
+    });
+    document.querySelectorAll("form").forEach(function (f) {
+      f.addEventListener("submit", function () {
+        var b = f.querySelector("button[type=submit]");
+        b.disabled = true; b.setAttribute("aria-busy", "true");
+      });
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Add a company{% endblock %}
+{% block main %}
+<section class="intro">
+  <h1>Add a company</h1>
+  <p class="lead">Type the name and choose one of the company's test certificates. Its header (name, address,
+    logo) is copied onto a new certificate; the table stays the same as for every company.</p>
+</section>
+
+{% if error %}<p class="notice stop" role="alert">{{ error }}</p>{% endif %}
+
+<form class="choose company-new" method="post" action="{{ url_for('read_company_sample') }}" enctype="multipart/form-data">
+  <label class="field text">
+    <span class="field-label">Company name, as in the company menu</span>
+    <input type="text" name="name" value="{{ name }}" maxlength="60" required autocomplete="off">
+  </label>
+
+  <div class="files">
+    <label class="file">
+      <span class="file-tag">1</span>
+      <span class="file-title">A test certificate</span>
+      <span class="file-help">One of the company's own, as an Excel file (.xls or .xlsx)</span>
+      <span class="file-name" data-empty="No file chosen">No file chosen</span>
+      <span class="file-pick">Choose file or drop it here</span>
+      <input type="file" name="sample" accept=".xls,.xlsx" required>
+    </label>
+    <div class="file-stack">
+      <label class="file small">
+        <span class="file-title">Logo <span class="opt">optional</span></span>
+        <span class="file-help">Only if the certificate's own logo isn't found</span>
+        <span class="file-name" data-empty="No file chosen">No file chosen</span>
+        <input type="file" name="logo" accept=".png,.jpg,.jpeg,.bmp,.gif">
+      </label>
+      <label class="file small">
+        <span class="file-title">Stamp <span class="opt">optional</span></span>
+        <span class="file-help">Placed above "Tested by"</span>
+        <span class="file-name" data-empty="No file chosen">No file chosen</span>
+        <input type="file" name="stamp" accept=".png,.jpg,.jpeg,.bmp,.gif">
+      </label>
+    </div>
+  </div>
+
+  <div class="go-row">
+    <button class="btn btn-primary" type="submit">Read the certificate</button>
+    <a class="link" href="{{ url_for('choose_files') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll(".file").forEach(function (box) {
+    var input = box.querySelector("input"), name = box.querySelector(".file-name");
+    input.addEventListener("change", function () {
+      var f = input.files[0];
+      name.textContent = f ? f.name : name.dataset.empty;
+      box.classList.toggle("chosen", !!f);
+    });
+    ["dragenter", "dragover"].forEach(function (t) { box.addEventListener(t, function () { box.classList.add("over"); }); });
+    ["dragleave", "drop"].forEach(function (t) { box.addEventListener(t, function () { box.classList.remove("over"); }); });
+  });
+  document.querySelector("form.choose").addEventListener("submit", function (e) {
+    var b = e.target.querySelector("button[type=submit]");
+    b.disabled = true; b.setAttribute("aria-busy", "true"); b.textContent = "Reading the certificate…";
+  });
+</script>
+{% endblock %}

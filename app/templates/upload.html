@@ -1,35 +1,44 @@
 {% extends "base.html" %}
 {% block main %}
+{% set current = chosen or (companies[0][0] if companies else none) %}
+{% set rec = records.get(current, {}) %}
+{% set one = rec.started %}
 <section class="intro">
-  <h1>Make test certificates for new entries</h1>
-  <p class="lead">Choose the production register you last made certificates from, and the register as it is now.
-    Only entries added since then get a certificate.</p>
+  <h1>Test Reports for IS 4984:2016</h1>
+  <p class="lead">Choose the production register as it is now. Entries that already got a certificate are
+    remembered for each company, so only the new ones are listed.</p>
 </section>
 
 {% if error %}<p class="notice stop" role="alert">{{ error }}</p>{% endif %}
+{% if added %}<p class="notice done" role="status">{{ added }} was added and is chosen below.</p>{% endif %}
 
 <form class="choose" method="post" action="{{ url_for('check_entries') }}" enctype="multipart/form-data">
-  <label class="field company">
-    <span class="field-label">Company</span>
-    <select name="company" required>
-      {% for id, name in companies %}
-      <option value="{{ id }}"{% if id == chosen %} selected{% endif %}>{{ name }}</option>
-      {% endfor %}
-    </select>
-  </label>
+  <div class="company-row">
+    <label class="field company">
+      <span class="field-label">Company</span>
+      <select name="company" required>
+        {% for id, name in companies %}
+        <option value="{{ id }}"{% if id == current %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <a class="link" href="{{ url_for('new_company') }}">Add a company</a>
+  </div>
 
-  <div class="files">
-    <label class="file">
+  <p class="record" id="record" aria-live="polite"></p>
+
+  <div class="files{% if one %} single{% endif %}">
+    <label class="file" id="old-file"{% if one %} hidden{% endif %}>
       <span class="file-tag">1</span>
       <span class="file-title">Old register</span>
       <span class="file-help">The copy from last time</span>
       <span class="file-name" data-empty="No file chosen">No file chosen</span>
       <span class="file-pick">Choose file or drop it here</span>
-      <input type="file" name="old" accept=".xls,.xlsx" required>
+      <input type="file" name="old" accept=".xls,.xlsx"{% if not one %} required{% endif %}>
     </label>
-    <span class="files-join" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h14M13 6l6 6-6 6"/></svg></span>
-    <label class="file">
-      <span class="file-tag">2</span>
+    <span class="files-join" aria-hidden="true"{% if one %} hidden{% endif %}><svg viewBox="0 0 24 24"><path d="M4 12h14M13 6l6 6-6 6"/></svg></span>
+    <label class="file" id="new-file">
+      <span class="file-tag">{{ 1 if one else 2 }}</span>
       <span class="file-title">New register</span>
       <span class="file-help">With today’s entries</span>
       <span class="file-name" data-empty="No file chosen">No file chosen</span>
@@ -37,6 +46,8 @@
       <input type="file" name="new" accept=".xls,.xlsx" required>
     </label>
   </div>
+
+  <p class="switch"{% if not one %} hidden{% endif %}><button type="button" class="link" id="use-old">Compare with an old register instead</button></p>
 
   <div class="go-row">
     <button class="btn btn-primary" type="submit">Find new entries</button>
@@ -46,6 +57,7 @@
 
 {% block scripts %}
 <script>
+  var RECORDS = {{ records|tojson }};
   document.querySelectorAll(".file").forEach(function (box) {
     var input = box.querySelector("input"), name = box.querySelector(".file-name");
     input.addEventListener("change", function () {
@@ -60,8 +72,44 @@
       box.addEventListener(t, function () { box.classList.remove("over"); });
     });
   });
+
+  // With a record for the company the new register is enough; without one (first time, or the record
+  // is damaged) the old register is needed too. "Compare with an old register instead" works as before.
+  (function () {
+  var form = document.querySelector("form.choose"), company = form.querySelector("select[name=company]");
+  var oldBox = document.getElementById("old-file"), oldInput = oldBox.querySelector("input");
+  var join = form.querySelector(".files-join"), files = form.querySelector(".files");
+  var newTag = document.querySelector("#new-file .file-tag"), line = document.getElementById("record");
+  var switchRow = form.querySelector(".switch"), useOld = document.getElementById("use-old");
+  var showOld = false;
+
+  function render() {
+    var rec = RECORDS[company.value] || {}, name = company.options[company.selectedIndex].text;
+    var both = !rec.started || showOld;
+    oldBox.hidden = join.hidden = !both;
+    files.classList.toggle("single", !both);
+    oldInput.required = !rec.started;
+    if (!both && oldInput.value) { oldInput.value = ""; oldInput.dispatchEvent(new Event("change")); }
+    newTag.textContent = both ? "2" : "1";
+    switchRow.hidden = !rec.started;
+    useOld.textContent = showOld ? "Use the record instead" : "Compare with an old register instead";
+    line.className = "record" + (rec.started ? "" : " first");
+    line.textContent = rec.broken
+      ? "The record of certified entries for " + name + " can't be read. Choose the old register too: a new record is started from the two registers."
+      : !rec.started
+      ? "First time for " + name + ": choose the old register too. After this download, the new register alone is enough."
+      : showOld
+      ? "The two registers are compared, as before. The old register's entries are added to the record."
+      : "Checked against the record: " + rec.certified + (rec.certified === 1 ? " entry" : " entries") + " certified"
+        + (rec.last ? ", last on " + rec.last : "") + ".";
+  }
+  company.addEventListener("change", function () { showOld = false; render(); });
+  useOld.addEventListener("click", function () { showOld = !showOld; render(); });
+  render();
+  })();
+
   document.querySelector("form.choose").addEventListener("submit", function (e) {
-    var b = e.target.querySelector("button");
+    var b = e.target.querySelector("button[type=submit]");
     b.disabled = true; b.setAttribute("aria-busy", "true"); b.textContent = "Reading the registers…";
   });
 </script>

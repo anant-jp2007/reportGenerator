@@ -195,14 +195,14 @@ its row 7 (name of product) is ignored.
 - Checked against Excel's and Word's own print: one page each, logo and stamp within 0.6 pt in all three.
 - Company pictures (`images` in the profile) replace the old single signature setting; Balaji has none.
 
-## More companies: Avtar Polyplast, Navdeep Polyplast (Shreenathji) (2026-10-30)
+## More companies: Avtar Polyplast, Shreenathji Polyplast (id `navdeep`) (2026-10-30)
 
 Same rule as for Abhay: only the header changes; the table, the test-value rules and the register
 reading stay the same. Report No. and file names come from each register's column D, whatever the code
 (AP63/…, A100/…, NP100/…, SP100/…).
 - Avtar: logo top left, "AVTAR POLYPLAST PVT.LTD", address in two rows, "Works ✆ …" phone line, title with
   CM/L 7600108409. "Tested by :-" kept, signed by hand (user decision). Template `templates/test_report_avtar.xlsx`.
-- Navdeep: header as on their certificate ("SHREENATHJI POLYPLAST", address, "Mfg. All Type Of HDPE Pipe &
+- Shreenathji: header as on their certificate ("SHREENATHJI POLYPLAST", address, "Mfg. All Type Of HDPE Pipe &
   Sprinkler Pipe.", phones and e-mail, title with CM/L 7600224411). No pictures. Their sheet's hidden rows
   (Party Name, Purchase Order No.) are not used. "Tested by :-" kept. Template `templates/test_report_navdeep.xlsx`.
 - Both pay for the taller header with shorter empty rows under the table (38: 6 pt, 39: 15, 40–42: 13.5);
@@ -214,8 +214,8 @@ reading stay the same. Report No. and file names come from each register's colum
 ### Register reading for all companies
 - Grade sheets are found by name, ignoring case, spaces and punctuation: "Production 63", "PE 63", "PE-63",
   "Prod 63"… Other sheets (Total, Monthwise…) are ignored. A grade with no sheet in either file is skipped
-  silently (e.g. Navdeep makes only PE 100); a sheet in only one of the two files is an error for that grade.
-- New entries are found by Sr. No. first: key = (grade, financial year, Sr. No.). A key may repeat (Navdeep
+  silently (e.g. Shreenathji makes only PE 100); a sheet in only one of the two files is an error for that grade.
+- New entries are found by Sr. No. first: key = (grade, financial year, Sr. No.). A key may repeat (Shreenathji
   has two Sr. 78 rows; Avtar's PE 80 sheet repeats last year's block): each old row covers one new row with
   that key, the identical one first, so only the extra rows are new.
 - **User decision:** when the PN and the SDR written in the size don't match the chart (e.g. PE 63
@@ -237,3 +237,68 @@ A second kind of report, chosen on the check screen: **Report 1** (a certificate
   columns are copied unchanged (values and number formats) and its free columns are filled first; the rest
   goes to new sheets, numbered on from it ("Report 2 - 3" → "Report 2 - 4"). A full last sheet or a file that
   isn't a Report 2 is refused with the reason. .xls and .xlsx accepted.
+
+## Record of certified entries: one register is enough (2026-11-01)
+
+So that only the register as it is now has to be uploaded (user's request), each company has a
+record of what was certified: `ledger/<company id>.json` (local, not in git; `app/ledger.py`).
+- **Filled** after every download (Report 1, Report 2 or both) with the ticked entries: grade, financial
+  year, Sr. No., date, size, batch and the Report No. used (typed or from the register). And, when an old
+  register was compared, with all of the old register's entries (they count as done, as in the comparison).
+- **Checked** with the same matching as two registers (`production.not_covered`): key = grade + financial
+  year + Sr. No.; an identical recorded entry first, then any with the key; each recorded entry covers one
+  row. So edited entries stay done, and repeated Sr. Nos. are counted.
+- **Never twice:** entries already recorded aren't added again, so downloading the same entries again
+  (another format, Report 2 later, an older check screen) changes nothing.
+- **Unticked entries stay new** until they are downloaded (unlike keeping a copy of the last register).
+- **First time for a company:** no record, so one register is refused with "choose the old register too".
+- **Old register still possible** ("Compare with an old register instead"): compared exactly as before.
+- **Grades:** the record knows a grade once it has seen its sheet read without error. A register with a
+  grade the record doesn't know (new or renamed sheet) gets that grade skipped with a message; a register
+  missing a sheet the record knows says so. An old register's unreadable sheet doesn't count.
+- **The check screen** works from a copy of the record taken when the files were checked, so a second
+  download from the same screen lists the same entries.
+- **Safety:** saved to a temporary file first, then swapped in; the previous version is kept as
+  `<id>.previous.json`. A damaged record is never treated as empty (that would make every entry new): it
+  is renamed `<id>.damaged <time>.json` and the old register is asked for, which starts a new record.
+  If the record can't be saved, the certificates are still given and the done screen says so in red.
+- Found while building: two new rows with the same Sr. No. had the same id on the check screen, so only
+  one could be downloaded. The id now includes the row in the sheet.
+
+## Preview and changing values (2026-11-01)
+
+On the check screen each entry has **View**: its certificate drawn in the browser as it prints
+(`app/preview.py`, from the same template grid as the PDF and Word, lines broken by the PDF's own
+routine). User's decisions: the values are plain boxes, no ranges shown and no warnings (the ranges are
+the user's own); the header, fixed texts and chart limits can't be changed.
+- **Can be changed:** Report No. (the same box as in the list), the three dates, the batch, and every test
+  value obtained (the cells of `random_values`). `report.editable_cells` lists them from the settings.
+- **What gets printed:** the page keeps the values first shown and the values shown now, and sends them
+  with the download (`v-<entry>-<cell>`); `report.apply_values` puts them in. So PDF, Excel, Word and
+  Report 2 show exactly the preview, edits included. Entries never opened are drawn fresh at download,
+  as before.
+- **Typed values:** a number stays a number with the decimals typed (Excel's format follows it), a date
+  in the date cells is read as a date (printed dd-mm-yyyy); anything else is printed as typed; an emptied
+  box prints blank. Dates are independent: changing the manufacturing date doesn't move the testing dates.
+- **New random values:** draws the test values again (dates and batch keep any change). **Undo changes:**
+  back to the values first shown (or last drawn), and the Report No. back to the register's.
+- A changed entry is marked "Edited" in the list.
+
+## Adding a company in the app (2026-11-01)
+
+- **Sample:** one of the company's own test certificates (.xls or .xlsx). Its header is everything above the
+  "Test Report No." row; each sheet row is one header line (its cells joined), hidden rows skipped. Wingdings
+  signs are read back as the sign (✆), superscripts kept. In an .xlsx the logo is the picture in the header and
+  the stamp a picture near the bottom; an .xls can't give its pictures, so the logo is chosen separately.
+- **Rows:** the line with "test certificate / test report / IS 4984" is row 5; the biggest font is row 1;
+  phone, email or website lines go to row 4; the rest to rows 2 and 3. Every row can be corrected on the check
+  screen (text, size 6–30, bold).
+- **Layout:** as the hand-made companies: with a logo, rows 1–3 in C:L and the logo at A1; without one, A:L.
+  Row heights come from the wrapped text (same measurements as the PDF). If the header is taller than the
+  page allows (about 116 pt), the sizes of rows 2–4 (down to 8) and then row 1 (down to 16) go down by 0.5 until it fits; if it still
+  doesn't, the user is asked to shorten the text. The table (rows 6–42) is never changed.
+- **Stamp:** at J38 like Abhay's, 54 pt high; without a stamp, "Tested by :-" can be kept or left blank.
+- **Saving:** the new id is the first word of the name (shree, shree2...). Pictures go to `assets/`, the
+  template to `templates/test_report_<id>.xlsx`, the profile to the end of `company.profiles` (the rest of
+  settings.json kept as written). The settings are checked before writing; the previous file is kept as
+  `config/settings.previous.json`; on any failure the new files are removed and settings.json is untouched.

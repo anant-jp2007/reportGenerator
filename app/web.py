@@ -6,6 +6,11 @@ Runs only on this computer (127.0.0.1), no internet needed. Uploaded registers a
 uploads/<id>/ for a day so the review screen can be generated from; every download is also
 saved in output/<date time>/ as a history.
 
+New entries are found against the company's record of certified entries (ledger/<id>.json, see
+app/ledger.py), so the register as it is now is enough. An old register can still be chosen: then
+the two registers are compared as before, and the old one's entries are added to the record. A
+company without a record needs the old register once. Every download adds its entries to the record.
+
 The ZIP is sorted by grade: a file per certificate goes in a "PE 63" / "PE 80" / "PE 100"
 folder; "all in one file" makes one file per grade and format (PE 63.pdf, PE 80.pdf...).
 Only grades with ticked entries appear.
@@ -23,19 +28,24 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, abort, render_template, request, send_file
+from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 
-from app.production import GRADE_ORDER, find_new_rows
+from app.ledger import LedgerError, find_new_in_ledger, ledger_path, load, readable_grades, set_aside
+from app.production import GRADE_ORDER, find_new_rows, read_production
 from app.render_excel import write_excel, write_excel_combined
 from app.render_pdf import write_pdf, write_pdf_combined
 from app.render_word import write_word, write_word_combined
-from app.report import build_report
+from app.new_company import CompanyError, Draft, make_draft, preview_settings, read_sample, sample_row, save_company
+from app.new_company import _png as to_png
+from app.preview import certificate_html
+from app.report import apply_values, build_report, editable_cells
 from app.report2 import Report2Error, write_report2
 from app.settings import SettingsError, companies, load_settings, with_company
 
 ROOT = Path(__file__).resolve().parent.parent
 UPLOADS = ROOT / "uploads"
 OUTPUT = ROOT / "output"
+LEDGER = ROOT / "ledger"
 ALLOWED = {".xls", ".xlsx"}
 KEEP_UPLOADS_HOURS = 24
 HOST, PORT = "127.0.0.1", 5050
@@ -45,9 +55,10 @@ app.config["MAX_CONTENT_LENGTH"] = 30 * 1024 * 1024   # registers are a few hund
 
 
 def row_id(row) -> str:
-    """Stable id of a production row: grade + financial year + Sr. No. (same key as detection)."""
+    """Id of a production row: grade + financial year + Sr. No. (the detection key) + its row in the
+    sheet, so two new rows with the same Sr. No. stay apart. The same file is read again on download."""
     grade, fy, sr = row.key
-    return f"{grade.replace(' ', '')}-{fy}-{sr}"
+    return f"{grade.replace(' ', '')}-{fy}-{sr}-{row.excel_row}"
 
 
 def _clean_old_uploads():
@@ -68,10 +79,17 @@ def _upload_dir(token: str) -> Path:
     return d
 
 
-def _files(d: Path) -> tuple[Path, Path]:
-    old = next(d.glob("old.*"))
-    new = next(d.glob("new.*"))
-    return old, new
+def _old_file(d: Path) -> Path | None:
+    return next(d.glob("old.*"), None)
+
+
+def _diff(d: Path):
+    """The new entries of this upload: against the old register if one was chosen, else against the
+    copy of the record taken when the files were checked (so a second download sees the same list)."""
+    new, old = next(d.glob("new.*")), _old_file(d)
+    if old:
+        return find_new_rows(old, new)
+    return find_new_in_ledger(load(d / "ledger.json"), new)
 
 
 def _companies():
@@ -81,23 +99,55 @@ def _companies():
         return []
 
 
+def _records(company_ids) -> dict[str, dict]:
+    """Per company: is there a record to check against, and what it holds (for the first screen)."""
+    out = {}
+    for cid in company_ids:
+        try:
+            led = load(ledger_path(LEDGER, cid))
+            out[cid] = {"started": led.started, "certified": led.certified, "last": led.last, "broken": False}
+        except LedgerError:
+            out[cid] = {"started": False, "certified": 0, "last": None, "broken": True}
+    return out
+
+
+def _start_page(chosen=None, error=None, code=200, added=None):
+    listed = _companies()
+    return render_template("upload.html", step=1, companies=listed, chosen=chosen, error=error, added=added,
+                           records=_records([cid for cid, _ in listed])), code
+
+
 @app.get("/")
 def choose_files():
-    return render_template("upload.html", step=1, companies=_companies(), chosen=None, error=None)
+    added = dict(_companies()).get(request.args.get("added", ""))
+    return _start_page(request.args.get("added") if added else None, added=added)
 
 
 @app.post("/check")
 def check_entries():
     _clean_old_uploads()
     files = {k: request.files.get(k) for k in ("old", "new")}
-    missing = [label for k, label in (("old", "old register"), ("new", "new register"))
-               if not files[k] or not files[k].filename]
+    files = {k: f for k, f in files.items() if f and f.filename}
     company = request.form.get("company", "")
     names_by_id = dict(_companies())
     if company not in names_by_id:
         return _upload_error("Choose the company the certificates are for.")
-    if missing:
-        return _upload_error(f"Choose the {' and the '.join(missing)}.", company)
+    record = None
+    if "old" not in files:
+        # one register: checked against the company's record, which must exist
+        try:
+            record = load(ledger_path(LEDGER, company))
+        except LedgerError as e:
+            why = str(e)
+            return _upload_error(f"{why[0].upper()}{why[1:]}. Choose the old register too: the two registers are "
+                                 "compared and a new record is started from them.", company)
+        if not record.started:
+            what = "the old register and the new register" if "new" not in files else "the old register too"
+            return _upload_error(f"Choose {what}: there's no record yet of what was certified for "
+                                 f"{names_by_id[company]}. After this download, the new register alone is enough.",
+                                 company)
+    if "new" not in files:
+        return _upload_error("Choose the new register.", company)
     for k, f in files.items():
         if Path(f.filename).suffix.lower() not in ALLOWED:
             return _upload_error(f"'{f.filename}' isn't an Excel file. Choose the .xls or .xlsx production register.",
@@ -111,21 +161,23 @@ def check_entries():
         f.save(d / f"{k}{Path(f.filename).suffix.lower()}")
         names[k] = f.filename
     (d / "company.txt").write_text(company, encoding="utf-8")
+    if record:
+        shutil.copyfile(record.path, d / "ledger.json")
 
     try:
-        diff = find_new_rows(*_files(d))
+        diff = _diff(d)
     except Exception as e:   # unreadable / corrupt workbook
         shutil.rmtree(d, ignore_errors=True)
         return _upload_error(f"One of the files couldn't be opened as an Excel register ({e}). "
                              "Open it in Excel, save it again and choose it here.", company)
-    return _review(token, names, names_by_id[company], diff)
+    return _review(token, names, names_by_id[company], diff, record)
 
 
 def _upload_error(message, company=None):
-    return render_template("upload.html", step=1, companies=_companies(), chosen=company, error=message), 400
+    return _start_page(company, message, 400)
 
 
-def _review(token, names, company_name, diff):
+def _review(token, names, company_name, diff, record=None):
     groups = []
     for grade in GRADE_ORDER:
         rows = [r for r in diff.new if r.grade == grade]
@@ -133,9 +185,148 @@ def _review(token, names, company_name, diff):
         good = [(r, r.report_no) for r in rows if r.ok]
         groups.append({"grade": grade, "rows": good,
                        "skipped": [r for r in rows if not r.ok]})
-    return render_template("review.html", step=2, company_name=company_name, token=token, names=names,
+    return render_template("review.html", step=2, company_name=company_name, token=token, names=names, record=record,
                            groups=groups, errors=diff.errors, notes=diff.notes,
                            total=sum(len(g["rows"]) for g in groups), row_id=row_id)
+
+
+# ---------- add a company from one of its certificates ----------
+
+PICTURES = {".png", ".jpg", ".jpeg", ".bmp", ".gif"}
+
+
+def _picture_upload(field: str) -> bytes | None:
+    """An uploaded logo / stamp as PNG, None when none was chosen; CompanyError if it isn't a picture."""
+    f = request.files.get(field)
+    if not f or not f.filename:
+        return None
+    if Path(f.filename).suffix.lower() not in PICTURES:
+        raise CompanyError(f"'{f.filename}' isn't a picture. Choose a .png or .jpg file")
+    try:
+        return to_png(f.read())
+    except Exception as e:
+        raise CompanyError(f"'{f.filename}' couldn't be read as a picture ({e})") from e
+
+
+def _company_dir(token: str) -> Path:
+    d = _upload_dir(token)
+    if not (d / "draft.json").is_file():
+        abort(410, "These files are no longer here. Choose the registers again.")
+    return d
+
+
+def _company_page(d: Path, error=None, code=200):
+    """The add-company check screen: the five header rows to correct, and a sample certificate."""
+    draft = Draft.from_json((d / "draft.json").read_text(encoding="utf-8"))
+    logo, stamp = (p.read_bytes() if p.is_file() else None for p in (d / "logo.png", d / "stamp.png"))
+    try:
+        s = preview_settings(draft, d, logo, stamp)
+        sheet = certificate_html(build_report(sample_row(), None, s), s, editable=False)
+    except CompanyError as e:
+        sheet, error = None, error or f"{str(e)[0].upper()}{str(e)[1:]}."
+    notes = (d / "notes.txt").read_text(encoding="utf-8").splitlines() if (d / "notes.txt").is_file() else []
+    return render_template("company_check.html", step=0, token=d.name, draft=draft, has_logo=bool(logo),
+                           has_stamp=bool(stamp), sheet=sheet, error=error, notes=notes), code
+
+
+@app.get("/company")
+def new_company():
+    return render_template("company_new.html", step=0, error=None, name=""), 200
+
+
+@app.post("/company")
+def read_company_sample():
+    _clean_old_uploads()
+    name = " ".join(request.form.get("name", "").split())
+    sample = request.files.get("sample")
+
+    def error(message):
+        return render_template("company_new.html", step=0, error=message, name=name), 400
+
+    if not name:
+        return error("Type the company's name, as it should appear in the company menu.")
+    if len(name) > 60:
+        return error("The name is too long for the company menu (60 letters at most).")
+    if name.lower() in {n.lower() for _, n in _companies()}:
+        return error(f"There's already a company called {name}.")
+    if not sample or not sample.filename:
+        return error("Choose one of the company's test certificates (the Excel file).")
+    suffix = Path(sample.filename).suffix.lower()
+    if suffix not in ALLOWED:
+        return error(f"'{sample.filename}' isn't an Excel file. Choose the company's certificate (.xls or .xlsx).")
+    d = UPLOADS / secrets.token_hex(8)
+    d.mkdir(parents=True)
+    try:
+        logo, stamp = _picture_upload("logo"), _picture_upload("stamp")
+        sample.save(d / f"sample{suffix}")
+        found = read_sample(d / f"sample{suffix}")
+        logo, stamp = logo or found.logo, stamp or found.stamp
+        draft = make_draft(name, found, has_stamp=bool(stamp))
+    except CompanyError as e:
+        shutil.rmtree(d, ignore_errors=True)
+        return error(f"{str(e)[0].upper()}{str(e)[1:]}.")
+    for data, file in ((logo, "logo.png"), (stamp, "stamp.png")):
+        if data:
+            (d / file).write_bytes(data)
+    (d / "draft.json").write_text(draft.to_json(), encoding="utf-8")
+    notes = [] if logo else found.notes
+    (d / "notes.txt").write_text("\n".join(notes), encoding="utf-8")
+    return _company_page(d)
+
+
+@app.post("/company/update")
+def update_company():
+    d = _company_dir(request.form.get("token", ""))
+    draft = Draft.from_json((d / "draft.json").read_text(encoding="utf-8"))
+    draft.name = " ".join(request.form.get("name", draft.name).split()) or draft.name
+    for i in range(5):
+        draft.texts[i] = request.form.get(f"text{i + 1}", draft.texts[i]).replace("\r\n", "\n").strip()
+        try:
+            draft.sizes[i] = min(30.0, max(6.0, round(float(request.form.get(f"size{i + 1}", draft.sizes[i])) * 2) / 2))
+        except ValueError:
+            pass
+        draft.bold[i] = f"bold{i + 1}" in request.form
+    draft.tested_by = "tested_by" in request.form
+    try:
+        for kind in ("logo", "stamp"):
+            new = _picture_upload(kind)
+            if new:
+                (d / f"{kind}.png").write_bytes(new)
+            elif f"remove_{kind}" in request.form:
+                (d / f"{kind}.png").unlink(missing_ok=True)
+    except CompanyError as e:
+        (d / "draft.json").write_text(draft.to_json(), encoding="utf-8")
+        return _company_page(d, f"{str(e)[0].upper()}{str(e)[1:]}.", 400)
+    (d / "draft.json").write_text(draft.to_json(), encoding="utf-8")
+    (d / "notes.txt").unlink(missing_ok=True)
+    return _company_page(d)
+
+
+@app.post("/company/save")
+def save_new_company():
+    d = _company_dir(request.form.get("token", ""))
+    draft = Draft.from_json((d / "draft.json").read_text(encoding="utf-8"))
+    logo, stamp = (p.read_bytes() if p.is_file() else None for p in (d / "logo.png", d / "stamp.png"))
+    try:
+        cid = save_company(draft, logo, stamp)
+    except CompanyError as e:
+        return _company_page(d, f"{str(e)[0].upper()}{str(e)[1:]}.", 400)
+    shutil.rmtree(d, ignore_errors=True)
+    return redirect(url_for("choose_files", added=cid))
+
+
+@app.get("/preview")
+def preview():
+    """One entry's certificate for the preview window, with new random test values. The page keeps
+    what it shows (and any changes) and sends it with the download, so the files match the preview."""
+    d = _upload_dir(request.args.get("token", ""))
+    company = (d / "company.txt").read_text(encoding="utf-8")
+    settings = with_company(load_settings(), company)
+    row = {row_id(r): r for r in _diff(d).new if r.ok}.get(request.args.get("row", ""))
+    if row is None:
+        abort(400, "An entry is no longer in the register. Choose the files again.")
+    number = request.args.get("no", row.report_no).strip()
+    return certificate_html(build_report(row, number, settings), settings)
 
 
 @app.post("/download")
@@ -168,16 +359,22 @@ def download():
         incomplete = d / f"incomplete report 2{suffix}"
         upload.save(incomplete)
 
-    settings = with_company(load_settings(), (d / "company.txt").read_text(encoding="utf-8"))
-    diff = find_new_rows(*_files(d))
+    company = (d / "company.txt").read_text(encoding="utf-8")
+    settings = with_company(load_settings(), company)
+    diff = _diff(d)
     by_id = {row_id(r): r for r in diff.new if r.ok}
+    editable = editable_cells(settings)
     reports = []
     for rid in chosen:
         row = by_id.get(rid)
         if row is None:
             abort(400, "An entry is no longer in the register. Choose the files again.")
         number = request.form.get(f"no-{rid}", row.report_no).strip()
-        reports.append(build_report(row, number, settings))
+        rep = build_report(row, number, settings)
+        # values seen (and maybe changed) in the preview: printed exactly as shown there
+        apply_values(rep, {ref: request.form[f"v-{rid}-{ref}"] for ref in editable
+                           if f"v-{rid}-{ref}" in request.form}, settings)
+        reports.append(rep)
     reports.sort(key=lambda rep: GRADE_ORDER.index(rep.row.grade))   # stable: register order within a grade
     _unique_names(reports)
 
@@ -205,11 +402,13 @@ def download():
                 for rep in reps:
                     made.append(one(rep, out / grade / f"{rep.file_name}{ext}"))
 
+    recorded = _record(d, company, reports)
     if which == {"2"}:                     # Report 2 alone: just its Excel file, no ZIP
         resp = send_file(report2, as_attachment=True, download_name=f"Report 2 {stamp[:10]}.xlsx",
                          mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         resp.headers["X-Certificates"] = str(len(reports))
         resp.headers["X-Saved-To"] = str(out)
+        resp.headers["X-Recorded"] = recorded
         return resp
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -223,7 +422,31 @@ def download():
                      download_name=f"Test certificates {stamp[:10]}.zip")
     resp.headers["X-Certificates"] = str(len(reports))
     resp.headers["X-Saved-To"] = str(out)
+    resp.headers["X-Recorded"] = recorded
     return resp
+
+
+def _record(d: Path, company: str, reports) -> str:
+    """Add this download's entries (and the old register's, if one was compared) to the company's
+    record. Returns "ok", or why the record couldn't be saved (shown on the done screen)."""
+    path, old = ledger_path(LEDGER, company), _old_file(d)
+    try:
+        led = load(path)
+    except LedgerError:
+        # a damaged record is kept, renamed; a new one starts from the old register, or from the
+        # copy taken when these files were checked
+        set_aside(path)
+        led = load(path) if old else load(d / "ledger.json")
+        led.path = path
+    try:
+        if old:
+            read = read_production(old)
+            led.add(read.rows, "old register", grades=readable_grades(read))
+        led.add([rep.row for rep in reports], "certified", {id(rep.row): rep.number for rep in reports})
+        led.save()
+    except OSError as e:
+        return f"not saved ({e})"
+    return "ok"
 
 
 def _new_folder(path: Path) -> Path:
@@ -249,8 +472,7 @@ def _unique_names(reports):
 @app.errorhandler(400)
 @app.errorhandler(410)
 def bad_request(e):
-    return render_template("upload.html", step=1, companies=_companies(), chosen=None,
-                           error=getattr(e, "description", None) or "Something was missing. Choose the files again."), e.code
+    return _start_page(None, getattr(e, "description", None) or "Something was missing. Choose the files again.", e.code)
 
 
 def main():

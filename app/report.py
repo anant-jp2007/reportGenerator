@@ -232,6 +232,45 @@ def build_report(row: Row, number: int | str | None = None, settings: dict | Non
     return Report(number_text, row, file_name, cells, ROOT / co["template"], pictures, warnings)
 
 
+def editable_cells(settings: dict) -> dict[str, str]:
+    """cell -> kind of the values that can be changed on the check screen: the three dates ("date"),
+    the batch ("batch") and every test value obtained ("test"). The Report No. is changed in its own
+    box on the check screen; headers, fixed texts and chart limits can't be changed."""
+    hc = settings["header_cells"]
+    out = {hc[k]: "date" for k in ("date_of_manufacturing", "testing_start", "testing_end")}
+    out[hc["batch"]] = "batch"
+    for c in settings["random_values"].values():
+        if isinstance(c, dict):
+            for ref in (c["cells"].values() if "cells" in c else [c["cell"]]):
+                out[ref] = "test"
+    return out
+
+
+NUMBER = re.compile(r"-?\d+(\.\d+)?")
+
+
+def apply_values(report: Report, values: dict[str, str], settings: dict) -> None:
+    """Put typed values into the report (text as typed). A number stays a number (decimals as typed),
+    a date a date when it can be read (05-05-2025); anything else is printed as text."""
+    from app.production import _to_date
+    kinds, pattern = editable_cells(settings), settings["report"]["date_format"]
+    for ref, text in values.items():
+        if ref not in kinds:
+            continue
+        text = text.strip()
+        old = report.cells.get(ref)
+        if old is not None and old.text == text:
+            continue
+        if not text:
+            report.cells[ref] = Cell(None, "")
+        elif kinds[ref] == "date" and (d := _to_date(text)):
+            report.cells[ref] = Cell(d, fmt_date(d, pattern))
+        elif kinds[ref] == "test" and NUMBER.fullmatch(text):
+            report.cells[ref] = Cell(float(text) if "." in text else int(text), text)
+        else:
+            report.cells[ref] = Cell(text, text)
+
+
 def build_reports(rows: list[Row], settings: dict | None = None,
                   rng: random.Random | None = None) -> list[Report]:
     """Reports in grade order (PE 63, PE 80, PE 100, top to bottom), Report No. from column D.
