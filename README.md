@@ -38,6 +38,8 @@ Test certificates 2026-10-30.zip
 └── PE 100/  …
 ```
 
+**Report 2** (testing record) can be made instead of or with the certificates: the same entries and values, 4 side by side per sheet, all in one Excel file. An earlier, incomplete Report 2 can be uploaded so its free columns are filled first.
+
 Rows the app can't certify (an unknown size, an empty size…) are listed with the reason, never silently dropped.
 
 ---

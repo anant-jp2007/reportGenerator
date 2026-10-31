@@ -137,6 +137,40 @@ html = text(upload(old, real))
 check("check screen offers PDF (ticked), Excel and Word",
       'value="pdf" checked' in html and 'value="excel"' in html and 'value="word"' in html)
 
+# Report 2 (testing record): alone it's one Excel file, with Report 1 it's added to the ZIP
+r = client.post("/download", data={"token": token, "row": ids, "files": "each", "report_choice": "1", "report": "2"})
+check("Report 2 alone: one Excel file, no ZIP", r.status_code == 200 and r.mimetype.endswith("spreadsheetml.sheet")
+      and "Report 2" in r.headers["Content-Disposition"] and r.headers["X-Certificates"] == "4", r.status_code)
+wb2 = openpyxl.load_workbook(io.BytesIO(r.data))
+check("Report 2: 4 entries in one sheet, Report Numbers in grade order", wb2.sheetnames == ["Report 2 - 1"]
+      and [wb2.active[f"{c}37"].value for c in "DEFG"] == ["MP63/171", "MP100/015", "MP100/018", "MP100/019"])
+r = client.post("/download", data={"token": token, "row": ids, "files": "each", "report_choice": "1", "report": ["1", "2"],
+                                   "format_choice": "1", "format": ["excel"]})
+z = zipfile.ZipFile(io.BytesIO(r.data))
+check("both reports: certificates in grade folders + 'Report 2.xlsx' in the ZIP", "Report 2.xlsx" in z.namelist()
+      and "PE 63/MP63-171.xlsx" in z.namelist(), z.namelist())
+d7 = openpyxl.load_workbook(io.BytesIO(z.read("PE 63/MP63-171.xlsx"))).active["J24"].value
+r2v = openpyxl.load_workbook(io.BytesIO(z.read("Report 2.xlsx"))).active["D13"].value
+check("both reports show the same test values (OD min)", d7 == r2v, (d7, r2v))
+partial = io.BytesIO()
+two = openpyxl.load_workbook(io.BytesIO(client.post("/download", data={
+    "token": token, "row": ids[:2], "files": "each", "report_choice": "1", "report": "2"}).data))
+two.save(partial)
+r = client.post("/download", data={"token": token, "row": ids[2:], "files": "each", "report_choice": "1", "report": "2",
+                                   "incomplete": (io.BytesIO(partial.getvalue()), "last report 2.xlsx")},
+                content_type="multipart/form-data")
+ws2 = openpyxl.load_workbook(io.BytesIO(r.data)).active
+check("incomplete Report 2 uploaded: its 2 free columns are filled",
+      [ws2[f"{c}37"].value for c in "DEFG"] == ["MP63/171", "MP100/015", "MP100/018", "MP100/019"],
+      [ws2[f"{c}37"].value for c in "DEFG"])
+r = client.post("/download", data={"token": token, "row": ids, "files": "each", "report_choice": "1", "report": "2",
+                                   "incomplete": (io.BytesIO(r.data), "full.xlsx")}, content_type="multipart/form-data")
+check("a full Report 2 uploaded: clear message", r.status_code == 400 and "already full" in text(r))
+r = client.post("/download", data={"token": token, "row": ids, "files": "each", "report_choice": "1"})
+check("neither report ticked: clear message", r.status_code == 400 and "Tick Report 1, Report 2 or both" in text(r))
+check("check screen offers Report 1 (ticked) and Report 2, and the incomplete Report 2 box",
+      'name="report" value="1" checked' in html and 'name="report" value="2">' in html and 'name="incomplete"' in html)
+
 r = client.post("/download", data={"token": token, "files": "each"})
 check("nothing ticked: clear message", r.status_code == 400 and "Tick at least one entry" in text(r))
 r = client.post("/download", data={"token": "abc123", "row": ids, "files": "each"})

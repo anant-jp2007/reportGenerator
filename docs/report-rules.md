@@ -220,3 +220,20 @@ reading stay the same. Report No. and file names come from each register's colum
   that key, the identical one first, so only the extra rows are new.
 - **User decision:** when the PN and the SDR written in the size don't match the chart (e.g. PE 63
   "50 X 6 ( SDR 17 )"), the PN is trusted and the SDR is taken from the chart, with a warning on the review screen.
+
+## Report 2: the testing record (2026-10-31)
+
+A second kind of report, chosen on the check screen: **Report 1** (a certificate per entry), **Report 2**, or both.
+- Layout from the user's "Report All Test" sheet: row labels in A:C, one entry per column D, E, F, G (4 per
+  sheet), A4 landscape. No company header, so the same for every company (`templates/report2.xlsx`, built by
+  `tools/make_report2_template.py`).
+- Every value is the one Report 1 prints for that entry (same random test values when both are made). The
+  row → Report 1 cell map is `report2.rows` in settings. Designation PE row = grade number (63/80/100).
+  Rows Report 1 has no value for are left empty: 18–24 (joint/27 °C/165 h/1000 h creep, slow crack growth,
+  butt-fusion, overall migration) and 34 "Signature of QCI".
+- **User decision:** all sheets in ONE Excel file (10 entries → sheets of 4, 4, 2, named "Report 2 - 1"…).
+  Report 2 alone downloads just that .xlsx; with Report 1 it goes in the ZIP as `Report 2.xlsx`.
+- **User decision:** an incomplete Report 2 can be uploaded (optional). Its last Report 2 sheet's filled
+  columns are copied unchanged (values and number formats) and its free columns are filled first; the rest
+  goes to new sheets, numbered on from it ("Report 2 - 3" → "Report 2 - 4"). A full last sheet or a file that
+  isn't a Report 2 is refused with the reason. .xls and .xlsx accepted.

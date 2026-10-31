@@ -30,6 +30,7 @@ from app.render_excel import write_excel, write_excel_combined
 from app.render_pdf import write_pdf, write_pdf_combined
 from app.render_word import write_word, write_word_combined
 from app.report import build_report
+from app.report2 import Report2Error, write_report2
 from app.settings import SettingsError, companies, load_settings, with_company
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -145,12 +146,27 @@ def download():
     if not chosen:
         abort(400, "Tick at least one entry.")
     combined = request.form.get("files") == "one"
+    # Report 1 = a certificate per entry, Report 2 = the testing record (entries side by side, one Excel
+    # file). The check screen always sends report_choice; without it (older forms) Report 1 is made.
+    which = set(request.form.getlist("report")) & {"1", "2"}
+    if not which and "report_choice" not in request.form:
+        which = {"1"}
+    if not which:
+        abort(400, "Tick Report 1, Report 2 or both.")
     # the check screen always sends format_choice; without it (older forms) Excel is made
-    formats = [f for f in ("pdf", "excel", "word") if f in request.form.getlist("format")]
-    if not formats and "format_choice" not in request.form:
+    formats = [f for f in ("pdf", "excel", "word") if f in request.form.getlist("format")] if "1" in which else []
+    if "1" in which and not formats and "format_choice" not in request.form:
         formats = ["excel"]
-    if not formats:
+    if "1" in which and not formats:
         abort(400, "Tick at least one format: PDF, Excel or Word.")
+    incomplete = None
+    upload = request.files.get("incomplete")
+    if "2" in which and upload and upload.filename:
+        suffix = Path(upload.filename).suffix.lower()
+        if suffix not in (".xls", ".xlsx"):
+            abort(400, "The incomplete Report 2 must be an Excel file (.xls or .xlsx).")
+        incomplete = d / f"incomplete report 2{suffix}"
+        upload.save(incomplete)
 
     settings = with_company(load_settings(), (d / "company.txt").read_text(encoding="utf-8"))
     diff = find_new_rows(*_files(d))
@@ -171,7 +187,13 @@ def download():
                "pdf": (".pdf", write_pdf, write_pdf_combined),
                "word": (".docx", write_word, write_word_combined)}
     by_grade = {g: [rep for rep in reports if rep.row.grade == g] for g in GRADE_ORDER}
-    made = []
+    made, report2 = [], None
+    if "2" in which:
+        try:
+            report2, _ = write_report2(reports, out / "Report 2.xlsx", incomplete, settings)
+        except Report2Error as e:
+            shutil.rmtree(out, ignore_errors=True)
+            abort(400, f"Report 2 not made: {e}.")
     for fmt in formats:
         ext, one, many = writers[fmt]
         for grade, reps in by_grade.items():
@@ -183,11 +205,19 @@ def download():
                 for rep in reps:
                     made.append(one(rep, out / grade / f"{rep.file_name}{ext}"))
 
+    if which == {"2"}:                     # Report 2 alone: just its Excel file, no ZIP
+        resp = send_file(report2, as_attachment=True, download_name=f"Report 2 {stamp[:10]}.xlsx",
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        resp.headers["X-Certificates"] = str(len(reports))
+        resp.headers["X-Saved-To"] = str(out)
+        return resp
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         order = {g: i for i, g in enumerate(GRADE_ORDER)}
         for f in sorted(made, key=lambda p: (order[p.stem if combined else p.parent.name], p.name)):
             z.write(f, f.relative_to(out).as_posix())     # only this download's files
+        if report2:
+            z.write(report2, report2.name)
     buf.seek(0)
     resp = send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"Test certificates {stamp[:10]}.zip")

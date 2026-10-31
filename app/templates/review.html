@@ -9,7 +9,7 @@
   {% for e in errors %}<p class="notice stop" role="alert">{{ e }}</p>{% endfor %}
 
   {% if total %}
-  <form id="make" method="post" action="{{ url_for('download') }}">
+  <form id="make" method="post" action="{{ url_for('download') }}" enctype="multipart/form-data">
     <input type="hidden" name="token" value="{{ token }}">
     <table class="entries">
       <thead>
@@ -46,6 +46,23 @@
     </table>
 
     <fieldset class="choice">
+      <legend>Report</legend>
+      <input type="hidden" name="report_choice" value="1">
+      <label><input type="checkbox" name="report" value="1" checked> Report 1: a certificate for each entry</label>
+      <label><input type="checkbox" name="report" value="2"> Report 2: testing record, 4 entries per sheet, one Excel file</label>
+    </fieldset>
+
+    <div id="r2-options" hidden>
+      <label class="file">
+        <span class="file-title">Incomplete Report 2 <span class="quiet">(optional)</span></span>
+        <span class="file-help">An earlier Report 2 whose last sheet has free columns: they are filled first</span>
+        <span class="file-name" data-empty="No file chosen">No file chosen</span>
+        <input type="file" name="incomplete" accept=".xls,.xlsx">
+      </label>
+    </div>
+
+    <div id="r1-options">
+    <fieldset class="choice">
       <legend>Format</legend>
       <input type="hidden" name="format_choice" value="1">
       <label><input type="checkbox" name="format" value="pdf" checked> PDF</label>
@@ -58,6 +75,7 @@
       <label><input type="radio" name="files" value="each" checked> A file for each certificate</label>
       <label><input type="radio" name="files" value="one"> One file per grade</label>
     </fieldset>
+    </div>
 
     <button class="primary" type="submit" id="go">Download {{ total }} {{ "certificate" if total == 1 else "certificates" }}</button>
   </form>
@@ -104,16 +122,29 @@
   var all = document.getElementById("all"), go = document.getElementById("go");
   var boxes = Array.prototype.slice.call(form.querySelectorAll("input[name=row]"));
 
+  var r1 = form.querySelector("input[name=report][value='1']"), r2 = form.querySelector("input[name=report][value='2']");
+  var file = form.querySelector("#r2-options .file"), fileInput = file.querySelector("input"), fileName = file.querySelector(".file-name");
+  fileInput.addEventListener("change", function () {
+    var f = fileInput.files[0];
+    fileName.textContent = f ? f.name : fileName.dataset.empty;
+    file.classList.toggle("chosen", !!f);
+  });
+
   function count() {
     var n = boxes.filter(function (b) { return b.checked; }).length;
-    go.textContent = n ? "Download " + n + (n === 1 ? " certificate" : " certificates") : "Tick an entry to download";
-    go.disabled = !n;
+    document.getElementById("r1-options").hidden = !r1.checked;
+    document.getElementById("r2-options").hidden = !r2.checked;
+    var what = r1.checked ? (n === 1 ? " certificate" : " certificates") : (n === 1 ? " entry in Report 2" : " entries in Report 2");
+    go.textContent = !n ? "Tick an entry to download" : !(r1.checked || r2.checked) ? "Tick Report 1 or Report 2"
+      : "Download " + n + what + (r1.checked && r2.checked ? " + Report 2" : "");
+    go.disabled = !n || !(r1.checked || r2.checked);
     all.checked = n === boxes.length;
     all.indeterminate = n > 0 && n < boxes.length;
     boxes.forEach(function (b) { b.closest("tr").classList.toggle("off", !b.checked); });
   }
   all.addEventListener("change", function () { boxes.forEach(function (b) { b.checked = all.checked; }); count(); });
   boxes.forEach(function (b) { b.addEventListener("change", count); });
+  [r1, r2].forEach(function (b) { b.addEventListener("change", count); });
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -127,10 +158,13 @@
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = name ? name[1] : "Test certificates.zip";
+        var zip = !name || /\.zip$/i.test(name[1]);
         document.body.appendChild(a); a.click(); a.remove();
-        document.getElementById("done-title").textContent = n + (n === "1" ? " certificate downloaded" : " certificates downloaded");
+        document.getElementById("done-title").textContent = zip
+          ? n + (n === "1" ? " certificate downloaded" : " certificates downloaded")
+          : "Report 2 downloaded (" + n + (n === "1" ? " entry)" : " entries)");
         document.getElementById("done-text").textContent =
-          "The ZIP file is in your Downloads folder. A copy is also saved in " + where;
+          (zip ? "The ZIP file" : "The Excel file") + " is in your Downloads folder. A copy is also saved in " + where;
         document.getElementById("review").hidden = true;
         document.getElementById("done").hidden = false;
         var steps = document.querySelectorAll(".steps li");

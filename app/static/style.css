@@ -277,6 +277,7 @@ h2 {
 .choice legend { padding: 0; margin-bottom: 8px; font-weight: 600; }
 .choice label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .choice input { accent-color: var(--stripe); width: 16px; height: 16px; }
+#r2-options { max-width: 460px; margin: -8px 0 28px; }
 
 .skipped {
   margin-top: 40px;

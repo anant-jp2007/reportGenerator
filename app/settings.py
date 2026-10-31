@@ -112,6 +112,20 @@ def validate(s: dict) -> list[str]:
             if not all(isinstance(img.get(k), (int, float)) and img[k] >= 0 for k in ("dx", "dy")) \
                     or not (isinstance(img.get("height"), (int, float)) and img["height"] > 0):
                 problems.append(f"{where}: dx and dy must be 0 or more, height above 0 (points)")
+
+    # Report 2: each row repeats what Report 1 prints in one of its cells
+    r2 = s.get("report2")
+    if r2 is not None:
+        if not (ROOT / str(r2.get("template", ""))).is_file():
+            problems.append(f"report2: template '{r2.get('template')}' not found")
+        cols = r2.get("entry_columns", [])
+        if not cols or not all(isinstance(c, str) and re.fullmatch(r"[A-Z]", c) for c in cols):
+            problems.append("report2: entry_columns must be column letters, e.g. [\"D\", \"E\", \"F\", \"G\"]")
+        for row, source in r2.get("rows", {}).items():
+            if not str(row).isdigit():
+                problems.append(f"report2 row '{row}': must be a row number")
+            elif source != "grade_number" and source not in used_cells:
+                problems.append(f"report2 row {row}: '{source}' is not a Report 1 cell the app fills or prints")
     return problems
 
 

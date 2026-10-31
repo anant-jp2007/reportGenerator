@@ -112,6 +112,24 @@
     "file_name": "Production column D (REPORT NO.) with / replaced by -, e.g. MP100/019 -> MP100-019"
   },
 
+  "report2": {
+    "_help": ["Report 2, the testing record: several entries side by side, one per column (D, E, F, G), all in one Excel file.",
+              "Each row takes the value Report 1 prints in the given Report 1 cell, so both reports show the same values.",
+              "'grade_number' = the grade without 'PE' (63, 80, 100). Rows not listed (18-24 and 34 'Signature of QCI') stay empty.",
+              "Same for every company. Template built by tools/make_report2_template.py."],
+    "template": "templates/report2.xlsx",
+    "entry_columns": ["D", "E", "F", "G"],
+    "rows": {
+      "2": "grade_number", "3": "J8", "4": "J9", "5": "J10",
+      "6": "D8", "7": "D11", "8": "D9", "9": "D10",
+      "10": "J17", "11": "J18", "12": "G19",
+      "13": "J24", "14": "J25", "15": "J26", "16": "J27", "17": "G28", "18": "G20", "19": "G23", "20": "G21",
+      "21": "G29",
+      "29": "G30", "30": "G31", "31": "G32", "32": "G33", "33": "G34", "34": "G35", "35": "G36", "36": "G37",
+      "37": "D7"
+    }
+  },
+
   "header_cells": {
     "_help": "Where each value from the production row goes.",
     "report_no": "D7",
